@@ -77,8 +77,8 @@ export default defineConfig(({mode}) => {
       })
     ],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.AI_INTEGRATIONS_GEMINI_API_KEY || env.GEMINI_API_KEY),
-      'process.env.AI_INTEGRATIONS_GEMINI_API_KEY': JSON.stringify(env.AI_INTEGRATIONS_GEMINI_API_KEY || env.GEMINI_API_KEY),
+      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.AI_INTEGRATIONS_GEMINI_API_KEY),
+      'process.env.AI_INTEGRATIONS_GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.AI_INTEGRATIONS_GEMINI_API_KEY),
     },
     resolve: {
       alias: {

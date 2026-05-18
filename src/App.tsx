@@ -20,6 +20,7 @@ import { SubscriptionPage } from './components/SubscriptionPage';
 import { BusinessSelectPage } from './components/BusinessSelectPage';
 import { SettingsPanel, POSSettings, DEFAULT_SETTINGS } from './components/SettingsPanel';
 import { BIChat } from './components/BIChat';
+import { OwnerDashboard, isMadisAdmin } from './components/OwnerDashboard';
 import { usePOSData } from './hooks/usePOSData';
 import { useAuth } from './hooks/useAuth';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
@@ -95,7 +96,12 @@ export default function App() {
   }
 
   if (auth.screen === 'landing' || auth.screen === 'auth') {
-    return <LandingPageRouter auth={auth} onDemo={(type: 'bar' | 'spa') => setDemoType(type)} />;
+    return <LandingPageRouter auth={auth} onDemo={(type: 'bar' | 'spa' | 'gym') => setDemoType(type)} />;
+  }
+
+  // MADIS platform admin — bypass all subscriber flows
+  if (auth.firebaseUser && isMadisAdmin(auth.firebaseUser.email)) {
+    return <OwnerDashboard email={auth.firebaseUser.email!} onLogout={auth.logout} />;
   }
 
   if (auth.screen === 'subscription') {
