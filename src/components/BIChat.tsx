@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Sparkles, WifiOff, Bot, User as UserIcon, Trash2, Loader } from 'lucide-react';
 import { Tab, Product, User, TabStatus } from '../types';
-import { GoogleGenAI } from '@google/genai';
 
 interface Message {
   id: string;
@@ -22,10 +21,6 @@ interface Props {
   isDemo?: boolean;
 }
 
-const AI_KEY = (typeof process !== 'undefined' ? process.env?.AI_INTEGRATIONS_GEMINI_API_KEY : undefined)
-  || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined)
-  || (import.meta as any).env?.VITE_AI_INTEGRATIONS_GEMINI_API_KEY
-  || '';
 
 function buildContext(businessName: string, tabs: Tab[], inventory: Product[], staff: User[]): string {
   const today = new Date().setHours(0, 0, 0, 0);
@@ -114,20 +109,20 @@ export const BIChat: React.FC<Props> = ({ uid, businessName, ownerName, tabs, in
         parts: [{ text: m.content }],
       }));
 
-      const ai = new GoogleGenAI({ apiKey: AI_KEY });
-      const chat = ai.chats.create({
-        model: 'gemini-2.5-flash',
-        config: { systemInstruction: ctx },
-        history,
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ systemInstruction: ctx, history, message: q }),
       });
-      const res = await chat.sendMessage({ message: q });
-      const text = res.text || 'Sorry, I could not generate a response.';
+      if (!res.ok) throw new Error('API request failed');
+      const data = await res.json();
+      const text = data.text || 'Sorry, I could not generate a response.';
 
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(), role: 'assistant', content: text, ts: Date.now()
       }]);
     } catch (e: any) {
-      setError(e?.message?.includes('API') ? 'API error — check your Gemini key.' : 'Something went wrong. Please try again.');
+      setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);

@@ -76,10 +76,6 @@ export default defineConfig(({mode}) => {
         }
       })
     ],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.AI_INTEGRATIONS_GEMINI_API_KEY),
-      'process.env.AI_INTEGRATIONS_GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.AI_INTEGRATIONS_GEMINI_API_KEY),
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -90,6 +86,12 @@ export default defineConfig(({mode}) => {
       port: 5000,
       allowedHosts: true,
       hmr: process.env.DISABLE_HMR !== 'true',
+      proxy: {
+        '/api': {
+          target: 'http://localhost:5001',
+          changeOrigin: true,
+        },
+      },
     },
   };
 });
