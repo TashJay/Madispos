@@ -122,6 +122,8 @@ export default function App() {
         email={auth.firebaseUser?.email || ''}
         onSave={auth.saveBusinessProfile}
         onLogout={auth.logout}
+        error={auth.error}
+        clearError={auth.clearError}
       />
     );
   }

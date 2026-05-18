@@ -134,7 +134,6 @@ export function useAuth(): AuthState {
     const update: Partial<BusinessProfile> = { businessName, businessType, ownerName };
     try {
       await setDoc(doc(db, 'users', firebaseUser.uid), update, { merge: true });
-      // Seed the owner staff member with the chosen PIN so usePOSData won't overwrite with defaults
       if (ownerPin) {
         const hashedPin = await hashPin(ownerPin);
         const ownerStaff = {
@@ -146,11 +145,13 @@ export function useAuth(): AuthState {
         const staffRef = doc(db, 'users', firebaseUser.uid, 'staff', ownerStaff.id);
         await setDoc(staffRef, ownerStaff);
       }
-      setProfile(prev => ({ ...prev, ...update } as BusinessProfile));
-      setScreen('pos');
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to save business profile:', e);
+      setError('Could not save your business profile — check your Firestore database is set up and rules are deployed. (' + (e?.message || 'Unknown error') + ')');
+      return;
     }
+    setProfile(prev => ({ ...prev, ...update } as BusinessProfile));
+    setScreen('pos');
   };
 
   const clearError = () => setError('');
