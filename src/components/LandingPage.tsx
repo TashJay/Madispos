@@ -10,7 +10,7 @@ import {
 interface Props {
   onGetStarted: () => void;
   onSignIn: () => void;
-  onDemo: (type: 'bar' | 'spa') => void;
+  onDemo: (type: 'bar' | 'spa' | 'gym') => void;
 }
 
 const features = [
@@ -340,7 +340,20 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
                   </div>
                   <div>
                     <p className="font-black text-white text-sm">Serenity Spa & Salon</p>
-                    <p className="text-white/40 text-xs mt-0.5 leading-relaxed">Service business POS — bookings, treatments, beauty services, client tabs.</p>
+                    <p className="text-white/40 text-xs mt-0.5 leading-relaxed">Service business POS — beauty treatments, massage, hair & nail services.</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setShowDemoPicker(false); onDemo('gym'); }}
+                  className="w-full flex items-start gap-4 p-5 bg-white/4 hover:bg-[#4F6EF6]/10 border border-white/8 hover:border-[#4F6EF6]/30 rounded-2xl transition-all group text-left"
+                >
+                  <div className="w-11 h-11 bg-[#4F6EF6]/15 rounded-xl flex items-center justify-center group-hover:bg-[#4F6EF6]/25 transition-colors shrink-0">
+                    <Dumbbell size={20} className="text-[#4F6EF6]" />
+                  </div>
+                  <div>
+                    <p className="font-black text-white text-sm">Apex Fitness Centre</p>
+                    <p className="text-white/40 text-xs mt-0.5 leading-relaxed">Fitness & gym POS — memberships, personal training, classes, supplements.</p>
                   </div>
                 </button>
               </div>

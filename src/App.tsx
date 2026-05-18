@@ -33,11 +33,15 @@ import {
   demoSpaStaff, demoSpaInventory, demoSpaTabs, demoSpaAuditLogs, demoSpaRooms,
   DEMO_SPA_BUSINESS_NAME, DEMO_SPA_BUSINESS_TYPE, DEMO_SPA_UID, DEMO_SPA_OWNER_NAME
 } from './demo/demoDataSpa';
+import {
+  demoGymStaff, demoGymInventory, demoGymTabs, demoGymAuditLogs, demoGymRooms,
+  DEMO_GYM_BUSINESS_NAME, DEMO_GYM_BUSINESS_TYPE, DEMO_GYM_UID, DEMO_GYM_OWNER_NAME
+} from './demo/demoDataGym';
 
 // ── Top-level router ──────────────────────────────────────────────────────────
 export default function App() {
   const auth = useAuth();
-  const [demoType, setDemoType] = useState<'bar' | 'spa' | null>(null);
+  const [demoType, setDemoType] = useState<'bar' | 'spa' | 'gym' | null>(null);
 
   if (demoType === 'bar') {
     return (
@@ -63,6 +67,20 @@ export default function App() {
         onLogout={() => setDemoType(null)}
         isDemo={true}
         demoData={{ staff: demoSpaStaff, inventory: demoSpaInventory, tabs: demoSpaTabs, auditLogs: demoSpaAuditLogs, rooms: demoSpaRooms }}
+      />
+    );
+  }
+
+  if (demoType === 'gym') {
+    return (
+      <POSApp
+        uid={DEMO_GYM_UID}
+        businessType={DEMO_GYM_BUSINESS_TYPE}
+        businessName={DEMO_GYM_BUSINESS_NAME}
+        ownerName={DEMO_GYM_OWNER_NAME}
+        onLogout={() => setDemoType(null)}
+        isDemo={true}
+        demoData={{ staff: demoGymStaff, inventory: demoGymInventory, tabs: demoGymTabs, auditLogs: demoGymAuditLogs, rooms: demoGymRooms }}
       />
     );
   }
@@ -113,11 +131,11 @@ export default function App() {
   }
 
   return (
-    <LandingPageRouter auth={auth} onDemo={(type: 'bar' | 'spa') => setDemoType(type)} />
+    <LandingPageRouter auth={auth} onDemo={(type: 'bar' | 'spa' | 'gym') => setDemoType(type)} />
   );
 }
 
-function LandingPageRouter({ auth, onDemo }: { auth: any; onDemo: (type: 'bar' | 'spa') => void }) {
+function LandingPageRouter({ auth, onDemo }: { auth: any; onDemo: (type: 'bar' | 'spa' | 'gym') => void }) {
   const [authMode, setAuthMode] = useState<'hidden' | 'signin' | 'signup'>('hidden');
 
   if (authMode !== 'hidden') {
@@ -757,7 +775,9 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
               <NavItem active={activeTab === 'staff'} icon={Users} label="Staff" onClick={() => { setActiveTab('staff'); setIsMobileMenuOpen(false); }} />
               <NavItem active={activeTab === 'audit'} icon={History} label="Audit Trail" onClick={() => { setActiveTab('audit'); setIsMobileMenuOpen(false); }} />
               <NavItem active={activeTab === 'settings'} icon={SlidersHorizontal} label="Settings" onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }} />
-              <NavItem active={activeTab === 'ai'} icon={Sparkles} label="Business AI" onClick={() => { setActiveTab('ai'); setIsMobileMenuOpen(false); }} />
+              {String(currentUser?.role).toUpperCase() === UserRole.OWNER && (
+                <NavItem active={activeTab === 'ai'} icon={Sparkles} label="Business AI" onClick={() => { setActiveTab('ai'); setIsMobileMenuOpen(false); }} />
+              )}
             </>
           )}
         </nav>
@@ -1140,7 +1160,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
               </motion.div>
             )}
 
-            {activeTab === 'ai' && isOwnerOrAdmin && (
+            {activeTab === 'ai' && String(currentUser?.role).toUpperCase() === UserRole.OWNER && (
               <motion.div key="ai" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col overflow-hidden">
                 <BIChat
                   businessName={businessName}

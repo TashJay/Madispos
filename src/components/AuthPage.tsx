@@ -179,8 +179,8 @@ export function AuthPage({ mode = 'signup', onSignInWithEmail, onSignUpWithEmail
         </p>
       </motion.div>
 
-      <p className="absolute bottom-6 text-white/15 text-xs z-10">
-        Built by <span className="text-white/35 font-bold">August</span>
+      <p className="absolute bottom-6 text-white/20 text-xs z-10 font-bold uppercase tracking-widest">
+        Powered by <span className="text-[#4F6EF6]/70">August</span>
       </p>
     </div>
   );

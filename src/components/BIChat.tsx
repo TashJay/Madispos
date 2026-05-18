@@ -23,9 +23,9 @@ interface Props {
 
 const STORAGE_KEY = 'madis_bi_chat_history';
 
-const AI_KEY = (import.meta as any).env?.VITE_AI_INTEGRATIONS_GEMINI_API_KEY
+const AI_KEY = (typeof process !== 'undefined' ? process.env?.AI_INTEGRATIONS_GEMINI_API_KEY : undefined)
   || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined)
-  || (typeof process !== 'undefined' ? process.env?.AI_INTEGRATIONS_GEMINI_API_KEY : undefined)
+  || (import.meta as any).env?.VITE_AI_INTEGRATIONS_GEMINI_API_KEY
   || '';
 
 function buildContext(businessName: string, tabs: Tab[], inventory: Product[], staff: User[]): string {
@@ -116,7 +116,7 @@ export const BIChat: React.FC<Props> = ({ businessName, ownerName, tabs, invento
 
       const ai = new GoogleGenAI({ apiKey: AI_KEY });
       const chat = ai.chats.create({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         config: { systemInstruction: ctx },
         history,
       });
@@ -140,11 +140,14 @@ export const BIChat: React.FC<Props> = ({ businessName, ownerName, tabs, invento
   };
 
   const suggested = [
-    'How are sales trending today?',
-    'Who is my top performing staff member?',
-    'What should I restock urgently?',
-    'How much is owed to me in debts?',
-    'What are my best-selling items?',
+    'What is my projected monthly revenue based on today\'s sales?',
+    'Which items have the highest profit contribution?',
+    'Which staff member should I consider promoting based on performance?',
+    'What are my slowest-moving items and what should I do about them?',
+    'Which hour of the day generates the most revenue?',
+    'Give me a summary of this week\'s business health.',
+    'How much is owed in debts and who are the biggest debtors?',
+    'What\'s my average transaction value and how can I increase it?',
   ];
 
   return (
