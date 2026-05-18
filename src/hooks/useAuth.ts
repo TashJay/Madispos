@@ -10,6 +10,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { hashPin } from '../lib/crypto';
 import type { BusinessProfile, BusinessType } from '../types';
 
 export type AuthScreen = 'landing' | 'auth' | 'subscription' | 'business-select' | 'pos';
@@ -25,7 +26,7 @@ export interface AuthState {
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   activateSubscription: () => Promise<void>;
-  saveBusinessProfile: (businessName: string, businessType: BusinessType, ownerName: string) => Promise<void>;
+  saveBusinessProfile: (businessName: string, businessType: BusinessType, ownerName: string, ownerPin?: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -126,15 +127,23 @@ export function useAuth(): AuthState {
     }
   };
 
-  const saveBusinessProfile = async (businessName: string, businessType: BusinessType, ownerName: string) => {
+  const saveBusinessProfile = async (businessName: string, businessType: BusinessType, ownerName: string, ownerPin?: string) => {
     if (!firebaseUser) return;
-    const update: Partial<BusinessProfile> = {
-      businessName,
-      businessType,
-      ownerName,
-    };
+    const update: Partial<BusinessProfile> = { businessName, businessType, ownerName };
     try {
       await setDoc(doc(db, 'users', firebaseUser.uid), update, { merge: true });
+      // Seed the owner staff member with the chosen PIN so usePOSData won't overwrite with defaults
+      if (ownerPin) {
+        const hashedPin = await hashPin(ownerPin);
+        const ownerStaff = {
+          id: `${firebaseUser.uid}-owner`,
+          name: ownerName,
+          pin: hashedPin,
+          role: 'OWNER',
+        };
+        const staffRef = doc(db, 'users', firebaseUser.uid, 'staff', ownerStaff.id);
+        await setDoc(staffRef, ownerStaff);
+      }
       setProfile(prev => ({ ...prev, ...update } as BusinessProfile));
       setScreen('pos');
     } catch (e) {

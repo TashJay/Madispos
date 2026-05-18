@@ -17,7 +17,7 @@ import { ConfirmDialog, DialogState } from './components/ConfirmDialog';
 import { LandingPage } from './components/LandingPage';
 import { AuthPage } from './components/AuthPage';
 import { SubscriptionPage } from './components/SubscriptionPage';
-import { BusinessSelectPage } from './components/BusinessSelectPage';
+import { OnboardingWizard } from './components/OnboardingWizard';
 import { SettingsPanel, POSSettings, DEFAULT_SETTINGS } from './components/SettingsPanel';
 import { BIChat } from './components/BIChat';
 import { OwnerDashboard, isMadisAdmin } from './components/OwnerDashboard';
@@ -116,7 +116,7 @@ export default function App() {
 
   if (auth.screen === 'business-select') {
     return (
-      <BusinessSelectPage
+      <OnboardingWizard
         email={auth.firebaseUser?.email || ''}
         onSave={auth.saveBusinessProfile}
         onLogout={auth.logout}
@@ -1169,6 +1169,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
             {activeTab === 'ai' && String(currentUser?.role).toUpperCase() === UserRole.OWNER && (
               <motion.div key="ai" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col overflow-hidden">
                 <BIChat
+                  uid={uid}
                   businessName={businessName}
                   ownerName={ownerName}
                   tabs={tabs}

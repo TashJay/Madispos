@@ -12,6 +12,7 @@ interface Message {
 }
 
 interface Props {
+  uid: string;
   businessName: string;
   ownerName: string;
   tabs: Tab[];
@@ -20,8 +21,6 @@ interface Props {
   isOnline: boolean;
   isDemo?: boolean;
 }
-
-const STORAGE_KEY = 'madis_bi_chat_history';
 
 const AI_KEY = (typeof process !== 'undefined' ? process.env?.AI_INTEGRATIONS_GEMINI_API_KEY : undefined)
   || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined)
@@ -74,10 +73,11 @@ Current Business Snapshot:
 All amounts are in Kenyan Shillings (KES). Answer questions about this data confidently.`;
 }
 
-export const BIChat: React.FC<Props> = ({ businessName, ownerName, tabs, inventory, staff, isOnline, isDemo }) => {
+export const BIChat: React.FC<Props> = ({ uid, businessName, ownerName, tabs, inventory, staff, isOnline, isDemo }) => {
+  const storageKey = `madis_bi_chat_${uid}`;
   const [messages, setMessages] = useState<Message[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(`madis_bi_chat_${uid}`);
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
@@ -92,8 +92,8 @@ export const BIChat: React.FC<Props> = ({ businessName, ownerName, tabs, invento
   }, [messages, isLoading]);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-50))); } catch {}
-  }, [messages]);
+    try { localStorage.setItem(storageKey, JSON.stringify(messages.slice(-50))); } catch {}
+  }, [messages, storageKey]);
 
   const send = async () => {
     const q = input.trim();
@@ -136,7 +136,7 @@ export const BIChat: React.FC<Props> = ({ businessName, ownerName, tabs, invento
 
   const clearHistory = () => {
     setMessages([]);
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey);
   };
 
   const suggested = [
