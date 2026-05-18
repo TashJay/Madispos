@@ -1151,6 +1151,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
                   currentUser={currentUser}
                   setEditingItem={setEditingItem}
                   onConfirmDialog={showConfirm}
+                  businessType={businessType}
                 />
               </motion.div>
             )}
@@ -1250,7 +1251,8 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
           {editingItem && (
             <InventoryEditModal
               item={editingItem}
-              categories={categories}
+              businessType={businessType}
+              existingCategories={categories}
               onConfirm={(updated: any) => {
                 if (editingItem.id === 'NEW') {
                   const newItem = { ...updated, id: crypto.randomUUID() };
@@ -1601,6 +1603,19 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
               </tr>
             </thead>
             <tbody className="divide-y themed-border">
+              {inventory.length === 0 && (
+                <tr>
+                  <td colSpan={6}>
+                    <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-40">
+                      <Package size={40} className="themed-text-dim" />
+                      <div className="text-center">
+                        <p className="font-black themed-text uppercase tracking-widest text-sm">No items yet</p>
+                        <p className="themed-text-dim text-xs mt-1">Click "Add New Product" to build your inventory</p>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
               {inventory.map((item: Product) => (
                 <tr key={item.id} className={`hover:bg-black/5 transition-colors group ${item.stock < 10 && item.type !== ProductType.SERVICE ? 'bg-red-500/[0.02]' : ''}`}>
                   <td className="py-6 px-8">
@@ -1670,9 +1685,33 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
   );
 }
 
-const DEFAULT_CATEGORIES = ['Beers', 'Spirits', 'Cocktails', 'Soft Drinks', 'Food', 'Services', 'Rooms', 'Membership'];
+const CATEGORIES_BY_BUSINESS_TYPE: Record<string, string[]> = {
+  bar:        ['Beers', 'Spirits', 'Wines', 'Cocktails', 'Non-Alcoholic', 'Food', 'Shisha / Hookah', 'Other'],
+  nightclub:  ['Beers', 'Spirits', 'Wines', 'Cocktails', 'Non-Alcoholic', 'Food', 'Shisha / Hookah', 'VIP Packages', 'Other'],
+  restaurant: ['Mains', 'Starters', 'Sides', 'Desserts', 'Hot Drinks', 'Cold Drinks', 'Specials', 'Takeaway', 'Other'],
+  cafe:       ['Hot Drinks', 'Cold Drinks', 'Pastries & Snacks', 'Meals', 'Smoothies', 'Other'],
+  spa:        ['Hair', 'Nails', 'Skin & Facials', 'Massage', 'Waxing', 'Make-up', 'Spa Packages', 'Products', 'Other'],
+  salon:      ['Hair', 'Nails', 'Skin & Facials', 'Waxing', 'Make-up', 'Products', 'Other'],
+  gym:        ['Access', 'Membership', 'Classes', 'Personal Training', 'Supplements', 'Merchandise', 'Other'],
+  shop:       ['Electronics', 'Clothing', 'Food & Groceries', 'Household', 'Beauty & Personal Care', 'Stationery', 'General', 'Other'],
+  hardware:   ['Building Materials', 'Plumbing', 'Electrical', 'Paints', 'Tools', 'Timber & Boards', 'Fasteners', 'Other'],
+  rental:     ['Rooms', 'Conference & Events', 'Laundry', 'Food & Beverages', 'Transport', 'Extras', 'Other'],
+  hotel:      ['Rooms', 'Restaurant', 'Bar', 'Conference & Events', 'Laundry', 'Spa', 'Transport', 'Extras', 'Other'],
+  pharmacy:   ['OTC Medicines', 'Prescription', 'Vitamins & Supplements', 'Cosmetics & Beauty', 'Baby Care', 'Medical Devices', 'Other'],
+};
 
-function InventoryEditModal({ item, onConfirm, onCancel, categories = [] }: { item: any; onConfirm: (updated: any) => void; onCancel: () => void; categories?: string[] }) {
+function getBusinessCategories(businessType: string, existingCategories: string[] = []): string[] {
+  const base = CATEGORIES_BY_BUSINESS_TYPE[businessType] ?? ['General', 'Other'];
+  return Array.from(new Set([...base, ...existingCategories.filter(c => c && !base.includes(c))]));
+}
+
+function InventoryEditModal({ item, businessType = '', existingCategories = [], onConfirm, onCancel }: {
+  item: any;
+  businessType?: string;
+  existingCategories?: string[];
+  onConfirm: (updated: any) => void;
+  onCancel: () => void;
+}) {
   const [formData, setFormData] = useState({
     ...item,
     price: item.price === 0 ? '' : item.price,
@@ -1680,9 +1719,9 @@ function InventoryEditModal({ item, onConfirm, onCancel, categories = [] }: { it
   });
   const [customCategory, setCustomCategory] = useState('');
 
-  const allCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...categories])).sort();
-  const isCustom = formData.category && !allCategories.includes(formData.category);
-  const [showCustom, setShowCustom] = useState(isCustom);
+  const suggestedCategories = getBusinessCategories(businessType, existingCategories);
+  const isCurrentCustom = formData.category && !suggestedCategories.includes(formData.category);
+  const [showCustom, setShowCustom] = useState(isCurrentCustom);
 
   const handleConfirm = () => {
     onConfirm({
@@ -1701,7 +1740,15 @@ function InventoryEditModal({ item, onConfirm, onCancel, categories = [] }: { it
         <div className="space-y-6">
           <div className="space-y-2">
             <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Item Name</label>
-            <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold" placeholder="e.g. Tusker Cider" />
+            <input
+              type="text"
+              required
+              autoFocus
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold"
+              placeholder="e.g. Tusker Cider, Manicure, Day Pass…"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -1721,10 +1768,10 @@ function InventoryEditModal({ item, onConfirm, onCancel, categories = [] }: { it
                 className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none"
               >
                 <option value="" disabled>Select category…</option>
-                {allCategories.map(cat => (
+                {suggestedCategories.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
-                <option value="__custom__">Other (custom)…</option>
+                <option value="__custom__">+ New category…</option>
               </select>
               {showCustom && (
                 <input
@@ -1736,13 +1783,17 @@ function InventoryEditModal({ item, onConfirm, onCancel, categories = [] }: { it
                     setFormData({ ...formData, category: e.target.value });
                   }}
                   className="w-full themed-bg-primary border border-[#4F6EF6]/40 rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold mt-2"
-                  placeholder="Type custom category…"
+                  placeholder="Type new category name…"
                 />
               )}
             </div>
             <div className="space-y-2">
               <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Type</label>
-              <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none">
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none"
+              >
                 <option value="DRINK">Drink</option>
                 <option value="FOOD">Food</option>
                 <option value="ROOM">Room / Unit</option>
@@ -1754,18 +1805,36 @@ function InventoryEditModal({ item, onConfirm, onCancel, categories = [] }: { it
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Price (KES)</label>
-              <input type="number" required value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold" placeholder="0" />
+              <input
+                type="number"
+                required
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold"
+                placeholder="0"
+              />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Stock Level</label>
-              <input type="number" required value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold" placeholder="0" />
+              <input
+                type="number"
+                required
+                value={formData.stock}
+                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold"
+                placeholder="0"
+              />
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mt-10">
           <button onClick={onCancel} className="py-4 bg-black/5 themed-text-dim border themed-border rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black/10 transition-all font-mono">DISCARD</button>
-          <button onClick={handleConfirm} disabled={!formData.name || !formData.category} className="py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 shadow-[0_10px_20px_rgba(0,255,136,0.3)]">CONFIRM</button>
+          <button
+            onClick={handleConfirm}
+            disabled={!formData.name || !formData.category}
+            className="py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 shadow-[0_10px_20px_rgba(0,255,136,0.3)]"
+          >CONFIRM</button>
         </div>
       </div>
     </div>

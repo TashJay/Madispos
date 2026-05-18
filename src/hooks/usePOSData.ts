@@ -10,7 +10,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { User, InventoryItem, Tab, AuditLog, TabStatus, ProductType, Room, BusinessType } from '../types';
+import { User, InventoryItem, Tab, AuditLog, TabStatus, Room, BusinessType } from '../types';
 
 function cleanData(data: any): any {
   if (data === null || typeof data !== 'object') return data;
@@ -50,67 +50,6 @@ const LS = {
   },
 };
 
-function getDefaultInventory(businessType: BusinessType): InventoryItem[] {
-  switch (businessType) {
-    case 'bar':
-    case 'nightclub':
-      return [
-        { id: 'i1', name: 'Tusker Lager', price: 400, stock: 120, category: 'Beers', isQuickSell: true, type: ProductType.DRINK },
-        { id: 'i2', name: 'Hennessy VS 750ml', price: 8500, stock: 24, category: 'Spirits', isQuickSell: true, type: ProductType.DRINK },
-        { id: 'i3', name: 'Whisky (Single)', price: 600, stock: 200, category: 'Spirits', isQuickSell: true, type: ProductType.DRINK },
-        { id: 'i4', name: 'Soda / Mixers', price: 150, stock: 200, category: 'Non-Alcoholic', isQuickSell: true, type: ProductType.DRINK },
-        { id: 'f1', name: 'Nyama Choma (500g)', price: 900, stock: 50, category: 'Food', isQuickSell: false, type: ProductType.FOOD },
-      ];
-    case 'restaurant':
-    case 'cafe':
-      return [
-        { id: 'f1', name: 'Ugali & Sukuma', price: 150, stock: 999, category: 'Meals', isQuickSell: true, type: ProductType.FOOD },
-        { id: 'f2', name: 'Pilau', price: 200, stock: 50, category: 'Meals', isQuickSell: true, type: ProductType.FOOD },
-        { id: 'f3', name: 'Chapati', price: 30, stock: 100, category: 'Extras', isQuickSell: true, type: ProductType.FOOD },
-        { id: 'd1', name: 'Tea / Chai', price: 50, stock: 999, category: 'Drinks', isQuickSell: true, type: ProductType.DRINK },
-        { id: 'd2', name: 'Soda (500ml)', price: 100, stock: 100, category: 'Drinks', isQuickSell: true, type: ProductType.DRINK },
-      ];
-    case 'spa':
-    case 'salon':
-      return [
-        { id: 's1', name: 'Hair Wash & Set', price: 500, stock: 999, category: 'Hair', isQuickSell: true, type: ProductType.SERVICE },
-        { id: 's2', name: 'Manicure', price: 400, stock: 999, category: 'Nails', isQuickSell: true, type: ProductType.SERVICE },
-        { id: 's3', name: 'Pedicure', price: 500, stock: 999, category: 'Nails', isQuickSell: true, type: ProductType.SERVICE },
-        { id: 's4', name: 'Full Body Massage', price: 1500, stock: 999, category: 'Spa', isQuickSell: false, type: ProductType.SERVICE },
-        { id: 's5', name: 'Facial Treatment', price: 800, stock: 999, category: 'Spa', isQuickSell: false, type: ProductType.SERVICE },
-      ];
-    case 'gym':
-      return [
-        { id: 'g1', name: 'Day Pass', price: 200, stock: 999, category: 'Access', isQuickSell: true, type: ProductType.SERVICE },
-        { id: 'g2', name: 'Monthly Membership', price: 2500, stock: 999, category: 'Membership', isQuickSell: true, type: ProductType.SERVICE },
-        { id: 'g3', name: 'Personal Training (1hr)', price: 1500, stock: 999, category: 'Training', isQuickSell: false, type: ProductType.SERVICE },
-        { id: 'g4', name: 'Protein Shake', price: 250, stock: 60, category: 'Supplements', isQuickSell: true, type: ProductType.FOOD },
-      ];
-    case 'pharmacy':
-      return [
-        { id: 'p1', name: 'Paracetamol (Strip)', price: 30, stock: 500, category: 'OTC', isQuickSell: true, type: ProductType.SERVICE },
-        { id: 'p2', name: 'Antibiotics', price: 200, stock: 100, category: 'Prescription', isQuickSell: false, type: ProductType.SERVICE },
-        { id: 'p3', name: 'Antacid', price: 50, stock: 200, category: 'OTC', isQuickSell: true, type: ProductType.SERVICE },
-      ];
-    case 'hardware':
-      return [
-        { id: 'h1', name: 'Cement Bag (50kg)', price: 1200, stock: 200, category: 'Building', isQuickSell: true, type: ProductType.SERVICE },
-        { id: 'h2', name: 'Paint (4L)', price: 1800, stock: 50, category: 'Paints', isQuickSell: false, type: ProductType.SERVICE },
-        { id: 'h3', name: 'Nails (1kg)', price: 200, stock: 300, category: 'Hardware', isQuickSell: true, type: ProductType.SERVICE },
-      ];
-    case 'rental':
-    case 'hotel':
-      return [
-        { id: 'r1', name: 'Standard Room (Night)', price: 3500, stock: 10, category: 'Rooms', isQuickSell: true, type: ProductType.ROOM },
-        { id: 'r2', name: 'Deluxe Room (Night)', price: 5500, stock: 5, category: 'Rooms', isQuickSell: true, type: ProductType.ROOM },
-      ];
-    default:
-      return [
-        { id: 'def1', name: 'Item 1', price: 100, stock: 100, category: 'General', isQuickSell: true, type: ProductType.SERVICE },
-        { id: 'def2', name: 'Item 2', price: 250, stock: 50, category: 'General', isQuickSell: false, type: ProductType.SERVICE },
-      ];
-  }
-}
 
 function getDefaultRooms(businessType: BusinessType): Room[] {
   if (['rental', 'hotel', 'nightclub'].includes(businessType)) {
@@ -192,13 +131,8 @@ export function usePOSData(uid: string, businessType: BusinessType): POSData {
       userCol('inventory'),
       (snapshot) => {
         const docs = snapshot.docs.map(d => d.data() as InventoryItem);
-        if (docs.length > 0) {
-          setInventoryState(docs);
-          LS.set(lsKey('inventory'), docs);
-        } else {
-          const initial = getDefaultInventory(businessType);
-          initial.forEach(item => setDoc(userDoc('inventory', item.id), item).catch(() => {}));
-        }
+        setInventoryState(docs);
+        LS.set(lsKey('inventory'), docs);
       },
       (error) => handleFirestoreError(error, OperationType.LIST, `users/${uid}/inventory`)
     );
