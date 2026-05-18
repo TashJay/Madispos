@@ -145,7 +145,7 @@ export const PinPad: React.FC<PinPadProps> = ({ onSuccess, error, isOnline = tru
       </div>
 
       <div className="mt-12 flex flex-col items-center">
-        <span className="text-[10px] themed-text-dim opacity-25 font-black uppercase tracking-[0.3em]">Built by August</span>
+        <span className="text-[10px] themed-text-dim opacity-25 font-black uppercase tracking-[0.3em]">Powered by August</span>
       </div>
     </div>
   );

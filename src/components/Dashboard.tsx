@@ -388,7 +388,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tabs, invento
 
               <div className="mt-8 pt-6 border-t themed-border flex justify-between items-center">
                 <span className="text-[10px] themed-text-dim font-black uppercase tracking-widest">Shift data verified</span>
-                <span className="text-[9px] themed-text opacity-20 font-black uppercase tracking-widest">Built by August</span>
+                <span className="text-[9px] themed-text opacity-20 font-black uppercase tracking-widest">Powered by August</span>
               </div>
             </div>
           )}

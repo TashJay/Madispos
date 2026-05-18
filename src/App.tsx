@@ -5,7 +5,8 @@ import {
   Settings, CreditCard, ClipboardList, Package, Users,
   History, Wifi, WifiOff, X, Check, Save, RotateCcw,
   Sun, Moon, Zap, Crown, Eye, EyeOff, ArrowDown, Printer,
-  TrendingUp, Trash2, FileText, Download, Share, BarChart2, Play
+  TrendingUp, Trash2, FileText, Download, Share, BarChart2, Play,
+  Sparkles, SlidersHorizontal
 } from 'lucide-react';
 import { PinPad } from './components/PinPad';
 import { TransactionModal } from './components/TransactionModal';
@@ -17,6 +18,8 @@ import { LandingPage } from './components/LandingPage';
 import { AuthPage } from './components/AuthPage';
 import { SubscriptionPage } from './components/SubscriptionPage';
 import { BusinessSelectPage } from './components/BusinessSelectPage';
+import { SettingsPanel, POSSettings, DEFAULT_SETTINGS } from './components/SettingsPanel';
+import { BIChat } from './components/BIChat';
 import { usePOSData } from './hooks/usePOSData';
 import { useAuth } from './hooks/useAuth';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
@@ -26,22 +29,40 @@ import {
   demoStaff, demoInventory, demoTabs, demoAuditLogs, demoRooms,
   DEMO_BUSINESS_NAME, DEMO_BUSINESS_TYPE, DEMO_UID
 } from './demo/demoData';
+import {
+  demoSpaStaff, demoSpaInventory, demoSpaTabs, demoSpaAuditLogs, demoSpaRooms,
+  DEMO_SPA_BUSINESS_NAME, DEMO_SPA_BUSINESS_TYPE, DEMO_SPA_UID, DEMO_SPA_OWNER_NAME
+} from './demo/demoDataSpa';
 
 // ── Top-level router ──────────────────────────────────────────────────────────
 export default function App() {
   const auth = useAuth();
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoType, setDemoType] = useState<'bar' | 'spa' | null>(null);
 
-  if (isDemoMode) {
+  if (demoType === 'bar') {
     return (
       <POSApp
         uid={DEMO_UID}
         businessType={DEMO_BUSINESS_TYPE}
         businessName={DEMO_BUSINESS_NAME}
         ownerName="Demo Owner"
-        onLogout={() => setIsDemoMode(false)}
+        onLogout={() => setDemoType(null)}
         isDemo={true}
         demoData={{ staff: demoStaff, inventory: demoInventory, tabs: demoTabs, auditLogs: demoAuditLogs, rooms: demoRooms }}
+      />
+    );
+  }
+
+  if (demoType === 'spa') {
+    return (
+      <POSApp
+        uid={DEMO_SPA_UID}
+        businessType={DEMO_SPA_BUSINESS_TYPE}
+        businessName={DEMO_SPA_BUSINESS_NAME}
+        ownerName={DEMO_SPA_OWNER_NAME}
+        onLogout={() => setDemoType(null)}
+        isDemo={true}
+        demoData={{ staff: demoSpaStaff, inventory: demoSpaInventory, tabs: demoSpaTabs, auditLogs: demoSpaAuditLogs, rooms: demoSpaRooms }}
       />
     );
   }
@@ -56,7 +77,7 @@ export default function App() {
   }
 
   if (auth.screen === 'landing' || auth.screen === 'auth') {
-    return <LandingPageRouter auth={auth} onDemo={() => setIsDemoMode(true)} />;
+    return <LandingPageRouter auth={auth} onDemo={(type: 'bar' | 'spa') => setDemoType(type)} />;
   }
 
   if (auth.screen === 'subscription') {
@@ -92,11 +113,11 @@ export default function App() {
   }
 
   return (
-    <LandingPageRouter auth={auth} onDemo={() => setIsDemoMode(true)} />
+    <LandingPageRouter auth={auth} onDemo={(type: 'bar' | 'spa') => setDemoType(type)} />
   );
 }
 
-function LandingPageRouter({ auth, onDemo }: { auth: any; onDemo: () => void }) {
+function LandingPageRouter({ auth, onDemo }: { auth: any; onDemo: (type: 'bar' | 'spa') => void }) {
   const [authMode, setAuthMode] = useState<'hidden' | 'signin' | 'signup'>('hidden');
 
   if (authMode !== 'hidden') {
@@ -163,9 +184,21 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
   const [showIOSInstall, setShowIOSInstall] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'sales' | 'tabs' | 'inventory' | 'staff' | 'audit' | 'debts' | 'rooms' | 'reports'
+    'dashboard' | 'sales' | 'tabs' | 'inventory' | 'staff' | 'audit' | 'debts' | 'rooms' | 'reports' | 'settings' | 'ai'
   >('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const SETTINGS_KEY = `madis_settings_${uid}`;
+  const [posSettings, setPosSettings] = useState<POSSettings>(() => {
+    try {
+      const saved = localStorage.getItem(`madis_settings_${uid}`);
+      return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
+    } catch { return DEFAULT_SETTINGS; }
+  });
+  const saveSettings = (next: POSSettings) => {
+    setPosSettings(next);
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)); } catch {}
+  };
   const lastActivityRef = useRef(Date.now());
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -494,11 +527,16 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
     );
   };
 
-  const handlePrint = (tab: Tab) => {
+  const handlePrint = (tab: Tab, force = false) => {
     setPrintingTab(tab);
-    setTimeout(() => {
-      window.print();
-    }, 100);
+    if (force || posSettings.autoPrint) {
+      setTimeout(() => { window.print(); }, 100);
+    }
+  };
+
+  const manualPrint = (tab: Tab) => {
+    setPrintingTab(tab);
+    setTimeout(() => { window.print(); }, 100);
   };
 
   const printCurrentCart = () => {
@@ -596,8 +634,8 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
           Switch account
         </button>
 
-        <footer className="mt-8 text-[10px] themed-text-dim uppercase tracking-widest font-bold opacity-30">
-          Built by August
+        <footer className="mt-8 text-[10px] text-[#4F6EF6]/40 uppercase tracking-widest font-bold">
+          Powered by August
         </footer>
       </div>
     );
@@ -624,6 +662,8 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
       <Receipt
         tab={printingTab}
         staffName={staff.find(s => s.id === printingTab.staffId)?.name || 'Terminal'}
+        businessName={businessName}
+        tagline={posSettings.receiptTagline}
       />
     )}
     {isDemo && (
@@ -716,6 +756,8 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
               </div>
               <NavItem active={activeTab === 'staff'} icon={Users} label="Staff" onClick={() => { setActiveTab('staff'); setIsMobileMenuOpen(false); }} />
               <NavItem active={activeTab === 'audit'} icon={History} label="Audit Trail" onClick={() => { setActiveTab('audit'); setIsMobileMenuOpen(false); }} />
+              <NavItem active={activeTab === 'settings'} icon={SlidersHorizontal} label="Settings" onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }} />
+              <NavItem active={activeTab === 'ai'} icon={Sparkles} label="Business AI" onClick={() => { setActiveTab('ai'); setIsMobileMenuOpen(false); }} />
             </>
           )}
         </nav>
@@ -777,8 +819,8 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
             </button>
           )}
 
-          <p className="text-[8px] themed-text-dim text-center opacity-30 uppercase tracking-widest">
-            Built by August
+          <p className="text-[8px] text-[#4F6EF6]/50 text-center uppercase tracking-widest font-bold">
+            Powered by August
           </p>
         </div>
       </aside>
@@ -995,7 +1037,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
                       tab={tab}
                       staffName={staff.find(s => s.id === tab.staffId)?.name || 'Staff'}
                       onStatusChange={() => manageTab(tab.id)}
-                      onPrint={() => handlePrint(tab)}
+                      onPrint={() => manualPrint(tab)}
                       onDelete={isManagement ? () => handleDeleteTab(tab.id, tab.customerName) : undefined}
                     />
                   ))}
@@ -1021,7 +1063,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
                       tab={tab}
                       staffName={staff.find(s => s.id === tab.staffId)?.name || 'Staff'}
                       onStatusChange={() => settleTab(tab.id)}
-                      onPrint={() => handlePrint(tab)}
+                      onPrint={() => manualPrint(tab)}
                       onDelete={isOwnerOrAdmin ? () => handleDeleteTab(tab.id, tab.customerName) : undefined}
                       isDebt
                     />
@@ -1084,6 +1126,31 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
             {activeTab === 'reports' && (
               <motion.div key="reports" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col">
                 <Reports tabs={tabs} inventory={inventory} staff={staff} />
+              </motion.div>
+            )}
+
+            {activeTab === 'settings' && isOwnerOrAdmin && (
+              <motion.div key="settings" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full overflow-y-auto p-1 custom-scrollbar">
+                <SettingsPanel
+                  settings={posSettings}
+                  businessName={businessName}
+                  ownerName={ownerName}
+                  onSave={saveSettings}
+                />
+              </motion.div>
+            )}
+
+            {activeTab === 'ai' && isOwnerOrAdmin && (
+              <motion.div key="ai" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col overflow-hidden">
+                <BIChat
+                  businessName={businessName}
+                  ownerName={ownerName}
+                  tabs={tabs}
+                  inventory={inventory}
+                  staff={staff}
+                  isOnline={isOnline}
+                  isDemo={isDemo}
+                />
               </motion.div>
             )}
           </AnimatePresence>

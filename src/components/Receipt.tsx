@@ -4,9 +4,11 @@ import { Tab, TabItem } from '../types';
 interface ReceiptProps {
   tab: Tab;
   staffName: string;
+  businessName?: string;
+  tagline?: string;
 }
 
-export const Receipt: React.FC<ReceiptProps> = ({ tab, staffName }) => {
+export const Receipt: React.FC<ReceiptProps> = ({ tab, staffName, businessName = 'MADIS POS', tagline = '' }) => {
   const date = new Date(tab.updatedAt || tab.createdAt);
   const dateStr = date.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' });
   const timeStr = date.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -26,21 +28,18 @@ export const Receipt: React.FC<ReceiptProps> = ({ tab, staffName }) => {
         background: '#fff',
       }}
     >
-      {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: '6mm' }}>
         <div style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.5px', textTransform: 'uppercase' }}>
-          LIPS &amp; SIPS
+          {businessName}
         </div>
-        <div style={{ fontSize: '8px', letterSpacing: '3px', textTransform: 'uppercase', marginTop: '1mm' }}>
-          Premium Club Terminal
-        </div>
-        <div style={{ fontSize: '8px', marginTop: '1mm', opacity: 0.6 }}>
-          Nairobi, Kenya
-        </div>
+        {tagline && (
+          <div style={{ fontSize: '8px', letterSpacing: '2px', textTransform: 'uppercase', marginTop: '1mm' }}>
+            {tagline}
+          </div>
+        )}
         <div style={{ borderTop: '1px dashed #000', marginTop: '4mm' }} />
       </div>
 
-      {/* Transaction details */}
       <div style={{ marginBottom: '4mm' }}>
         <Row label="DATE" value={dateStr} />
         <Row label="TIME" value={timeStr} />
@@ -53,7 +52,6 @@ export const Receipt: React.FC<ReceiptProps> = ({ tab, staffName }) => {
 
       <div style={{ borderTop: '1px dashed #000', marginBottom: '4mm' }} />
 
-      {/* Items */}
       <div style={{ marginBottom: '4mm' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginBottom: '2mm', fontSize: '9px' }}>
           <span style={{ width: '10mm' }}>QTY</span>
@@ -73,7 +71,6 @@ export const Receipt: React.FC<ReceiptProps> = ({ tab, staffName }) => {
 
       <div style={{ borderTop: '1px dashed #000', marginBottom: '4mm' }} />
 
-      {/* Totals */}
       <div style={{ marginBottom: '6mm' }}>
         <Row label="SUBTOTAL" value={`KES ${subtotal.toLocaleString()}`} />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '13px', marginTop: '2mm' }}>
@@ -84,20 +81,19 @@ export const Receipt: React.FC<ReceiptProps> = ({ tab, staffName }) => {
 
       <div style={{ borderTop: '1px dashed #000', marginBottom: '6mm' }} />
 
-      {/* Footer */}
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '12px', fontWeight: 900, letterSpacing: '1px', marginBottom: '2mm' }}>
-          WELCOME AGAIN!
+          THANK YOU!
         </div>
         <div style={{ fontSize: '9px', marginBottom: '1mm' }}>
-          Thank you for choosing Lips &amp; Sips.
+          Thank you for choosing {businessName}.
         </div>
         <div style={{ fontSize: '9px', marginBottom: '4mm' }}>
-          We look forward to seeing you again soon.
+          We look forward to serving you again.
         </div>
         <div style={{ borderTop: '1px dashed #000', marginBottom: '4mm' }} />
         <div style={{ fontSize: '7px', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '2px' }}>
-          Powered by August Tech
+          Powered by August
         </div>
         <div style={{ fontSize: '7px', opacity: 0.4, marginTop: '1mm' }}>
           {tab.id.toUpperCase()}

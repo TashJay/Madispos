@@ -1,15 +1,16 @@
-import { motion } from 'motion/react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   BarChart2, ShieldCheck, Zap, Users, TrendingUp, Globe,
   Coffee, Dumbbell, Scissors, Pill, Home, Wrench, ShoppingBag,
   UtensilsCrossed, Wine, CheckCircle2, ArrowRight, Play,
-  Star, Moon, Building2, Smartphone
+  Star, Moon, Building2, Smartphone, X
 } from 'lucide-react';
 
 interface Props {
   onGetStarted: () => void;
   onSignIn: () => void;
-  onDemo: () => void;
+  onDemo: (type: 'bar' | 'spa') => void;
 }
 
 const features = [
@@ -56,6 +57,10 @@ const steps = [
 ];
 
 export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
+  const [showDemoPicker, setShowDemoPicker] = useState(false);
+
+  const openDemoPicker = () => setShowDemoPicker(true);
+
   return (
     <div className="min-h-screen bg-[#07090F] text-white overflow-x-hidden">
 
@@ -70,7 +75,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
-              onClick={onDemo}
+              onClick={openDemoPicker}
               className="hidden sm:flex items-center gap-1.5 text-sm text-white/60 hover:text-white border border-white/10 hover:border-white/20 px-3 py-1.5 rounded-lg transition-all"
             >
               <Play size={12} fill="currentColor" />
@@ -122,7 +127,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
               <ArrowRight size={18} />
             </button>
             <button
-              onClick={onDemo}
+              onClick={openDemoPicker}
               className="flex items-center gap-2 border border-white/15 bg-white/5 text-white/80 font-bold px-8 py-4 rounded-xl hover:border-[#4F6EF6]/40 hover:text-white hover:bg-white/8 transition-all text-base"
             >
               <Play size={16} fill="currentColor" className="text-[#4F6EF6]" />
@@ -228,14 +233,14 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
             </div>
             <h2 className="text-2xl sm:text-3xl font-black mb-3">See MADIS in action — no sign-up needed</h2>
             <p className="text-white/55 max-w-md mx-auto mb-7 text-sm leading-relaxed">
-              Jump straight into a live demo with real bar data. Browse inventory, process sales, check reports — experience the full system for free.
+              Jump straight into a live demo with realistic data. Browse inventory, process sales, check reports — experience the full system for free.
             </p>
             <button
-              onClick={onDemo}
+              onClick={openDemoPicker}
               className="inline-flex items-center gap-2 bg-[#4F6EF6] text-white font-black px-8 py-4 rounded-xl hover:bg-[#3D5CE4] transition-all hover:scale-105 shadow-[0_0_30px_rgba(79,110,246,0.3)]"
             >
               <Play size={16} fill="white" />
-              Launch Live Demo
+              Choose Your Demo
             </button>
             <p className="text-white/25 text-xs mt-4">No account required &nbsp;·&nbsp; Dummy data &nbsp;·&nbsp; Fully interactive</p>
           </div>
@@ -273,7 +278,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
                 Get Started Now
               </button>
               <button
-                onClick={onDemo}
+                onClick={openDemoPicker}
                 className="w-full mt-3 text-white/40 hover:text-white/70 text-sm transition-colors py-2 flex items-center justify-center gap-1.5"
               >
                 <Play size={12} fill="currentColor" />
@@ -283,6 +288,70 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
           </div>
         </motion.div>
       </section>
+
+      {/* Demo Picker Modal */}
+      <AnimatePresence>
+        {showDemoPicker && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+            onClick={() => setShowDemoPicker(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+              className="bg-[#0C1220] border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-xl font-black text-white">Choose a Demo</h3>
+                  <p className="text-white/40 text-sm mt-0.5">Pick a business type to explore</p>
+                </div>
+                <button onClick={() => setShowDemoPicker(false)} className="p-2 text-white/30 hover:text-white transition-colors rounded-xl">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => { setShowDemoPicker(false); onDemo('bar'); }}
+                  className="w-full flex items-start gap-4 p-5 bg-white/4 hover:bg-[#4F6EF6]/10 border border-white/8 hover:border-[#4F6EF6]/30 rounded-2xl transition-all group text-left"
+                >
+                  <div className="w-11 h-11 bg-[#4F6EF6]/15 rounded-xl flex items-center justify-center group-hover:bg-[#4F6EF6]/25 transition-colors shrink-0">
+                    <Wine size={20} className="text-[#4F6EF6]" />
+                  </div>
+                  <div>
+                    <p className="font-black text-white text-sm">The Grand Bar</p>
+                    <p className="text-white/40 text-xs mt-0.5 leading-relaxed">Bar & nightclub POS — tabs, drinks, staff leaderboard, M-Pesa payments.</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { setShowDemoPicker(false); onDemo('spa'); }}
+                  className="w-full flex items-start gap-4 p-5 bg-white/4 hover:bg-[#4F6EF6]/10 border border-white/8 hover:border-[#4F6EF6]/30 rounded-2xl transition-all group text-left"
+                >
+                  <div className="w-11 h-11 bg-[#4F6EF6]/15 rounded-xl flex items-center justify-center group-hover:bg-[#4F6EF6]/25 transition-colors shrink-0">
+                    <Scissors size={20} className="text-[#4F6EF6]" />
+                  </div>
+                  <div>
+                    <p className="font-black text-white text-sm">Serenity Spa & Salon</p>
+                    <p className="text-white/40 text-xs mt-0.5 leading-relaxed">Service business POS — bookings, treatments, beauty services, client tabs.</p>
+                  </div>
+                </button>
+              </div>
+
+              <p className="text-white/20 text-[10px] text-center mt-5">
+                No account required &nbsp;·&nbsp; Fully interactive &nbsp;·&nbsp; Simulated data only
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Footer */}
       <footer className="border-t border-white/5 py-10 px-4 sm:px-6">
@@ -295,7 +364,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
             <span className="text-white/25 text-xs hidden sm:inline">Market Analysis &amp; Data Insight System</span>
           </div>
           <p className="text-white/20 text-xs">
-            Built by <span className="text-white/45 font-bold">August</span> &nbsp;·&nbsp; © {new Date().getFullYear()}
+            Powered by <span className="text-[#4F6EF6]/70 font-bold">August</span> &nbsp;·&nbsp; © {new Date().getFullYear()}
           </p>
         </div>
       </footer>
