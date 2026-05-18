@@ -171,13 +171,18 @@ export function useAuth(): AuthState {
 
 function friendlyError(code: string): string {
   switch (code) {
-    case 'auth/user-not-found': return 'No account found with this email.';
+    case 'auth/user-not-found': return 'No account found with this email. Click "Create Account" to sign up first.';
     case 'auth/wrong-password': return 'Incorrect password. Please try again.';
-    case 'auth/email-already-in-use': return 'This email is already registered. Try signing in.';
+    case 'auth/email-already-in-use': return 'This email is already registered. Switch to "Sign In" instead.';
     case 'auth/weak-password': return 'Password must be at least 6 characters.';
     case 'auth/invalid-email': return 'Please enter a valid email address.';
     case 'auth/too-many-requests': return 'Too many attempts. Please wait a moment and try again.';
-    case 'auth/invalid-credential': return 'Incorrect email or password.';
+    case 'auth/invalid-credential': return 'Incorrect email or password. If you are new, click "Create Account" first.';
+    case 'auth/unauthorized-domain': return 'This domain is not authorised for sign-in. Please add it to your Firebase Console under Authentication → Settings → Authorised Domains.';
+    case 'auth/popup-blocked': return 'Pop-up was blocked by your browser. Please allow pop-ups for this site and try again.';
+    case 'auth/popup-closed-by-user': return 'Sign-in was cancelled. Please try again.';
+    case 'auth/operation-not-allowed': return 'This sign-in method is not enabled. Please enable it in Firebase Console.';
+    case 'auth/network-request-failed': return 'Network error. Please check your connection and try again.';
     default: return 'Something went wrong. Please try again.';
   }
 }

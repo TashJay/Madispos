@@ -7,13 +7,16 @@ interface PinPadProps {
   error?: string;
   isOnline?: boolean;
   businessName?: string;
+  lockoutSeconds?: number;
 }
 
-export const PinPad: React.FC<PinPadProps> = ({ onSuccess, error, isOnline = true, businessName }) => {
+export const PinPad: React.FC<PinPadProps> = ({ onSuccess, error, isOnline = true, businessName, lockoutSeconds = 0 }) => {
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
+  const isLocked = lockoutSeconds > 0;
 
   const handlePress = (val: string) => {
+    if (isLocked) return;
     if (pin.length < 4) {
       const newPin = pin + val;
       setPin(newPin);
@@ -86,9 +89,27 @@ export const PinPad: React.FC<PinPadProps> = ({ onSuccess, error, isOnline = tru
         )}
       </div>
 
+      {/* Lockout banner */}
+      <AnimatePresence>
+        {isLocked && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden w-full mb-4"
+          >
+            <div className="bg-red-500/10 border border-red-500/25 rounded-xl py-3 px-4 text-center">
+              <p className="text-red-400 text-[10px] font-black uppercase tracking-widest">Terminal Locked</p>
+              <p className="text-red-300 text-lg font-black mt-1">{lockoutSeconds}s</p>
+              <p className="text-red-400/60 text-[9px] mt-0.5">Too many failed attempts</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Error */}
       <AnimatePresence>
-        {error && (
+        {error && !isLocked && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -103,13 +124,14 @@ export const PinPad: React.FC<PinPadProps> = ({ onSuccess, error, isOnline = tru
       </AnimatePresence>
 
       {/* Keypad */}
-      <div className="grid grid-cols-3 gap-4 md:gap-5 w-full">
+      <div className={`grid grid-cols-3 gap-4 md:gap-5 w-full transition-opacity ${isLocked ? 'opacity-25 pointer-events-none' : ''}`}>
         {buttons.map((btn, i) => {
           if (btn === 'toggle') {
             return (
               <button
                 key={i}
                 onClick={() => setShowPin(!showPin)}
+                disabled={isLocked}
                 className={`h-16 md:h-20 flex items-center justify-center rounded-[1.5rem] transition-all active:scale-95 border ${
                   showPin
                     ? 'bg-[#4F6EF6]/10 border-[#4F6EF6]/30 text-[#4F6EF6]'
@@ -126,6 +148,7 @@ export const PinPad: React.FC<PinPadProps> = ({ onSuccess, error, isOnline = tru
               <button
                 key={i}
                 onClick={handleBackspace}
+                disabled={isLocked}
                 className="h-16 md:h-20 flex items-center justify-center rounded-[1.5rem] themed-bg-primary text-red-400/50 hover:text-red-400 hover:bg-red-500/5 transition-all active:scale-95 border themed-border"
               >
                 <Delete size={22} />
@@ -136,6 +159,7 @@ export const PinPad: React.FC<PinPadProps> = ({ onSuccess, error, isOnline = tru
             <button
               key={i}
               onClick={() => handlePress(btn)}
+              disabled={isLocked}
               className="h-16 md:h-20 text-2xl font-black rounded-[1.5rem] themed-bg-primary themed-text hover:bg-[#4F6EF6] hover:text-white hover:border-[#4F6EF6] hover:shadow-[0_0_20px_rgba(79,110,246,0.3)] transition-all border themed-border active:scale-95 shadow-sm"
             >
               {btn}

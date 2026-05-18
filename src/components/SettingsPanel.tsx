@@ -1,19 +1,38 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import {
-  Save, Printer, Bell, Palette, Building2, FileText,
-  CheckCircle2, Settings, ToggleLeft, ToggleRight
+  Save, Printer, Palette, Building2, FileText,
+  CheckCircle2, Settings, ToggleLeft, ToggleRight,
+  Globe, Timer, ShieldCheck
 } from 'lucide-react';
 
 export interface POSSettings {
   autoPrint: boolean;
   receiptTagline: string;
+  language: 'en' | 'sw';
+  autoLockMinutes: number;
 }
 
 export const DEFAULT_SETTINGS: POSSettings = {
   autoPrint: false,
   receiptTagline: '',
+  language: 'en',
+  autoLockMinutes: 30,
 };
+
+export const LANGUAGES: { value: 'en' | 'sw'; label: string; native: string }[] = [
+  { value: 'en', label: 'English', native: 'English' },
+  { value: 'sw', label: 'Swahili', native: 'Kiswahili' },
+];
+
+export const AUTO_LOCK_OPTIONS: { value: number; label: string }[] = [
+  { value: 0,   label: 'Never' },
+  { value: 5,   label: '5 minutes' },
+  { value: 15,  label: '15 minutes' },
+  { value: 30,  label: '30 minutes' },
+  { value: 60,  label: '1 hour' },
+  { value: 120, label: '2 hours' },
+];
 
 interface Props {
   settings: POSSettings;
@@ -62,7 +81,7 @@ export const SettingsPanel: React.FC<Props> = ({ settings, businessName, ownerNa
         <p className="themed-text-dim text-sm mt-1">Configure your POS preferences. Settings are saved locally and sync when online.</p>
       </header>
 
-      {/* Business info (read-only) */}
+      {/* Business Profile */}
       <section className="luxury-card p-6 space-y-4">
         <h3 className="text-xs font-black uppercase tracking-widest themed-text-dim flex items-center gap-2">
           <Building2 size={13} />
@@ -83,6 +102,78 @@ export const SettingsPanel: React.FC<Props> = ({ settings, businessName, ownerNa
         </p>
       </section>
 
+      {/* Language & Region */}
+      <section className="luxury-card p-6 space-y-4">
+        <h3 className="text-xs font-black uppercase tracking-widest themed-text-dim flex items-center gap-2">
+          <Globe size={13} />
+          Language &amp; Region
+        </h3>
+        <div>
+          <label className="text-[10px] themed-text-dim uppercase tracking-widest font-bold block mb-2">
+            Display Language
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {LANGUAGES.map(lang => (
+              <button
+                key={lang.value}
+                onClick={() => setDraft(d => ({ ...d, language: lang.value }))}
+                className={`flex flex-col items-start gap-1 p-4 rounded-xl border transition-all text-left ${
+                  draft.language === lang.value
+                    ? 'bg-[#4F6EF6]/10 border-[#4F6EF6]/40 text-[#4F6EF6]'
+                    : 'themed-bg-primary themed-border themed-text-dim hover:themed-text'
+                }`}
+              >
+                <span className="font-black text-sm">{lang.native}</span>
+                <span className="text-[10px] opacity-60">{lang.label}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] themed-text-dim mt-2">
+            Sets the language for receipts and key interface elements.
+          </p>
+        </div>
+      </section>
+
+      {/* Security & Access */}
+      <section className="luxury-card p-6 space-y-4">
+        <h3 className="text-xs font-black uppercase tracking-widest themed-text-dim flex items-center gap-2">
+          <ShieldCheck size={13} />
+          Security &amp; Access
+        </h3>
+        <div>
+          <label className="text-[10px] themed-text-dim uppercase tracking-widest font-bold block mb-2">
+            Auto-Lock Timer
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {AUTO_LOCK_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setDraft(d => ({ ...d, autoLockMinutes: opt.value }))}
+                className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all ${
+                  draft.autoLockMinutes === opt.value
+                    ? 'bg-[#4F6EF6]/10 border-[#4F6EF6]/40 text-[#4F6EF6]'
+                    : 'themed-bg-primary themed-border themed-text-dim hover:themed-text'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] themed-text-dim mt-2">
+            Automatically locks the terminal and returns to the PIN screen after this period of inactivity. Set to Never for shared devices where staff manage their own sessions.
+          </p>
+        </div>
+
+        <div className="p-4 bg-amber-500/5 border border-amber-500/15 rounded-xl">
+          <div className="flex gap-3 items-start">
+            <Timer size={15} className="text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-400/80 leading-relaxed">
+              <strong>Tip:</strong> Set a short lock time (5–15 min) if your terminal is in a public-facing area where customers could access it unsupervised.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Receipt Settings */}
       <section className="luxury-card p-6 space-y-4">
         <h3 className="text-xs font-black uppercase tracking-widest themed-text-dim flex items-center gap-2">
@@ -94,7 +185,7 @@ export const SettingsPanel: React.FC<Props> = ({ settings, businessName, ownerNa
           value={draft.autoPrint}
           onChange={v => setDraft(d => ({ ...d, autoPrint: v }))}
           label="Auto-Print Receipts"
-          description="When enabled, a print dialog opens automatically after every completed sale. Disable this if you prefer to print manually using the print button."
+          description="When enabled, a print dialog opens automatically after every completed sale."
         />
 
         <div>

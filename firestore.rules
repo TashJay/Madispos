@@ -2,79 +2,93 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Data validation helpers ───────────────────────────────────────────────
-    function incoming() { return request.resource.data; }
-    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    // ── Helper: check if the requester is the MADIS platform admin ────────────
+    function isMadisAdmin() {
+      return request.auth != null &&
+             request.auth.token.email == 'jirush36@gmail.com' &&
+             request.auth.token.email_verified == true;
+    }
 
-    function isValidUser(data) {
+    // ── Helper: check if the requester owns this user record ─────────────────
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // ── Helper: validate staff document ──────────────────────────────────────
+    function isValidStaff(data) {
       return data.keys().hasAll(['id', 'name', 'pin', 'role']) &&
              data.id is string && data.id.size() <= 128 &&
              data.name is string && data.name.size() <= 200 &&
-             data.role is string;
+             data.pin is string && data.pin.size() >= 8 &&
+             data.role in ['STAFF', 'SUPERVISOR', 'OWNER', 'ADMIN'];
     }
 
+    // ── Helper: validate inventory document ──────────────────────────────────
     function isValidInventory(data) {
       return data.keys().hasAll(['id', 'name', 'price', 'stock', 'category']) &&
-             data.id is string &&
-             data.price is number &&
-             data.stock is number;
+             data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 200 &&
+             data.price is number && data.price >= 0 &&
+             data.stock is number && data.stock >= 0;
     }
 
+    // ── Helper: validate tab document ────────────────────────────────────────
     function isValidTab(data) {
       return data.keys().hasAll(['id', 'staffId', 'customerName', 'items', 'total', 'status', 'createdAt', 'updatedAt']) &&
              data.id is string &&
              data.staffId is string &&
              data.items is list &&
-             data.total is number &&
+             data.total is number && data.total >= 0 &&
+             data.status in ['OPEN', 'PAID', 'UNPAID'] &&
              data.createdAt is number;
     }
 
-    function isValidRoom(data) {
-      return data.keys().hasAll(['id', 'number', 'type', 'price', 'status']) &&
-             data.price is number;
+    // ── Per-subscriber top-level profile document ─────────────────────────────
+    // Only the owner or MADIS admin can read. Only the owner can write.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isMadisAdmin();
+      allow create: if isOwner(userId) && request.resource.data.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if false; // Accounts are never deleted via client
+
+      // ── Staff subcollection ───────────────────────────────────────────────
+      match /staff/{staffId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidStaff(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // ── Inventory subcollection ───────────────────────────────────────────
+      match /inventory/{itemId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidInventory(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // ── Tabs subcollection ────────────────────────────────────────────────
+      match /tabs/{tabId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTab(request.resource.data);
+        allow update: if isOwner(userId) && isValidTab(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // ── Rooms subcollection ───────────────────────────────────────────────
+      match /rooms/{roomId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // ── Audit Logs (append-only, no delete or edit) ───────────────────────
+      match /auditLogs/{logId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update, delete: if false;
+      }
     }
 
-    function isValidAuditLog(data) {
-      return data.keys().hasAll(['id', 'userName', 'userId', 'action', 'details', 'timestamp']);
-    }
-
-    // ── Staff ─────────────────────────────────────────────────────────────────
-    match /staff/{staffId} {
-      allow get, list: if true;
-      allow create, update: if isValidUser(incoming()) && isValidId(staffId);
-      allow delete: if true;
-    }
-
-    // ── Inventory ─────────────────────────────────────────────────────────────
-    match /inventory/{itemId} {
-      allow get, list: if true;
-      allow create, update: if isValidInventory(incoming()) && isValidId(itemId);
-      allow delete: if true;
-    }
-
-    // ── Tabs ──────────────────────────────────────────────────────────────────
-    match /tabs/{tabId} {
-      allow get, list: if true;
-      allow create: if isValidTab(incoming()) && isValidId(tabId);
-      allow update: if isValidTab(incoming());
-      allow delete: if true;
-    }
-
-    // ── Rooms ─────────────────────────────────────────────────────────────────
-    match /rooms/{roomId} {
-      allow get, list: if true;
-      allow create, update: if isValidRoom(incoming()) && isValidId(roomId);
-      allow delete: if true;
-    }
-
-    // ── Audit Logs (append-only) ──────────────────────────────────────────────
-    match /auditLogs/{logId} {
-      allow get, list: if true;
-      allow create: if isValidAuditLog(incoming()) && isValidId(logId);
-      allow update, delete: if false;
-    }
-
-    // ── Default deny ──────────────────────────────────────────────────────────
+    // ── Deny everything else ──────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

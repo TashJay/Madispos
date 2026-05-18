@@ -207,6 +207,9 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showIOSInstall, setShowIOSInstall] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState(0);
+  const [lockoutSecondsLeft, setLockoutSecondsLeft] = useState(0);
   const [activeTab, setActiveTab] = useState<
     'dashboard' | 'sales' | 'tabs' | 'inventory' | 'staff' | 'audit' | 'debts' | 'rooms' | 'reports' | 'settings' | 'ai'
   >('dashboard');
@@ -252,12 +255,14 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
 
   useEffect(() => {
     if (!currentUser) return;
-    const timeout = 60000;
+    const lockMins = posSettings.autoLockMinutes ?? 30;
+    if (lockMins === 0) return; // "Never" — no auto-lock
+    const timeout = lockMins * 60 * 1000;
     const interval = setInterval(() => {
       if (Date.now() - lastActivityRef.current > timeout) {
         handleLogout();
       }
-    }, 5000);
+    }, 10000);
     const updateActivity = () => { lastActivityRef.current = Date.now(); };
     window.addEventListener('mousemove', updateActivity);
     window.addEventListener('keydown', updateActivity);
@@ -270,7 +275,8 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
       window.removeEventListener('touchstart', updateActivity);
       window.removeEventListener('click', updateActivity);
     };
-  }, [currentUser]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, posSettings.autoLockMinutes]);
 
   useEffect(() => {
     if (theme === 'light') {
@@ -316,16 +322,45 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
     setDialog({ title, message, type: 'alert', onConfirm: closeDialog });
   };
 
+  useEffect(() => {
+    if (lockoutUntil <= 0) return;
+    const tick = setInterval(() => {
+      const left = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      if (left <= 0) {
+        setLockoutSecondsLeft(0);
+        setLockoutUntil(0);
+        setLoginAttempts(0);
+        setLoginError('');
+        clearInterval(tick);
+      } else {
+        setLockoutSecondsLeft(left);
+      }
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [lockoutUntil]);
+
   const handleLogin = async (pin: string) => {
+    if (Date.now() < lockoutUntil) return;
     const hashed = await hashPin(pin);
-    let user = staff.find(u => u.pin === hashed) || staff.find(u => u.pin === pin);
+    const user = staff.find(u => u.pin === hashed) || staff.find(u => u.pin === pin);
     if (user) {
       setCurrentUser(user);
       setActiveTab('dashboard');
       setLoginError('');
+      setLoginAttempts(0);
+      setLockoutUntil(0);
       addAuditLog(user, 'Login', 'User logged in to terminal');
     } else {
-      setLoginError('Invalid PIN');
+      const next = loginAttempts + 1;
+      setLoginAttempts(next);
+      if (next >= 5) {
+        const until = Date.now() + 60_000;
+        setLockoutUntil(until);
+        setLockoutSecondsLeft(60);
+        setLoginError('Too many failed attempts. Locked for 60 seconds.');
+      } else {
+        setLoginError(`Invalid PIN. ${5 - next} attempt${5 - next === 1 ? '' : 's'} remaining.`);
+      }
     }
   };
 
@@ -642,7 +677,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
           <h1 className="text-3xl font-black themed-text tracking-tighter">MADIS</h1>
           <p className="text-[10px] text-[#4F6EF6] font-mono uppercase tracking-[0.3em]">{businessName}</p>
         </div>
-        <PinPad onSuccess={handleLogin} error={loginError} isOnline={isOnline} businessName={businessName} />
+        <PinPad onSuccess={handleLogin} error={loginError} isOnline={isOnline} businessName={businessName} lockoutSeconds={lockoutSecondsLeft} />
         {isDemo && (
           <div className="mt-6 flex items-center gap-2 bg-[#4F6EF6]/10 border border-[#4F6EF6]/25 rounded-xl px-4 py-2.5 text-xs text-[#4F6EF6]/80">
             <Play size={12} fill="currentColor" />
