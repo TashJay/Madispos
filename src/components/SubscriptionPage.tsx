@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
-  BarChart2, CheckCircle2, Phone, LogOut, CreditCard, Banknote
+  BarChart2, CheckCircle2, Phone, LogOut, CreditCard, Banknote, AlertCircle
 } from 'lucide-react';
 
 interface Props {
   email: string;
   onActivate: () => Promise<void>;
   onLogout: () => void;
+  error?: string;
+  clearError?: () => void;
 }
 
 const features = [
@@ -23,20 +25,32 @@ const features = [
 
 type PayMethod = 'mpesa' | 'card';
 
-export function SubscriptionPage({ email, onActivate, onLogout }: Props) {
+export function SubscriptionPage({ email, onActivate, onLogout, error, clearError }: Props) {
   const [payMethod, setPayMethod] = useState<PayMethod>('mpesa');
   const [phone, setPhone] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
   const [step, setStep] = useState<'plan' | 'pay' | 'processing' | 'done'>('plan');
+  const [localError, setLocalError] = useState('');
+
+  // If activation fails (error from auth), drop back to pay step so user isn't frozen
+  useEffect(() => {
+    if (error && step === 'done') {
+      setLocalError(error);
+      setStep('pay');
+      clearError?.();
+    }
+  }, [error, step, clearError]);
 
   const handlePay = async () => {
+    setLocalError('');
     setStep('processing');
     await new Promise(r => setTimeout(r, 2500));
     setStep('done');
     await new Promise(r => setTimeout(r, 900));
     await onActivate();
+    // If onActivate sets an error, the useEffect above will reset the step
   };
 
   const formatCard = (val: string) => {
@@ -185,6 +199,17 @@ export function SubscriptionPage({ email, onActivate, onLogout }: Props) {
               <Banknote size={14} />
               Total: <strong className="text-[#4F6EF6]">KSh 1,000</strong> &nbsp;—&nbsp; 1-year MADIS access
             </div>
+
+            {localError && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start gap-3 bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3"
+              >
+                <AlertCircle size={15} className="text-red-400 shrink-0 mt-0.5" />
+                <p className="text-red-400 text-xs leading-relaxed">{localError}</p>
+              </motion.div>
+            )}
 
             <button
               onClick={handlePay}

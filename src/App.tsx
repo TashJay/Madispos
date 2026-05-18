@@ -110,6 +110,8 @@ export default function App() {
         email={auth.firebaseUser?.email || ''}
         onActivate={auth.activateSubscription}
         onLogout={auth.logout}
+        error={auth.error}
+        clearError={auth.clearError}
       />
     );
   }

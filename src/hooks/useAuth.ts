@@ -120,11 +120,13 @@ export function useAuth(): AuthState {
     };
     try {
       await setDoc(doc(db, 'users', firebaseUser.uid), partial, { merge: true });
-      setProfile(prev => ({ ...prev, ...partial } as BusinessProfile));
-      setScreen('business-select');
-    } catch (e) {
-      console.error('Failed to activate subscription:', e);
+    } catch (e: any) {
+      console.error('Failed to save subscription to Firestore:', e);
+      setError('Could not save subscription — check your Firestore database is created and rules are deployed. (' + (e?.message || 'Unknown error') + ')');
+      return;
     }
+    setProfile(prev => ({ ...prev, ...partial } as BusinessProfile));
+    setScreen('business-select');
   };
 
   const saveBusinessProfile = async (businessName: string, businessType: BusinessType, ownerName: string, ownerPin?: string) => {
