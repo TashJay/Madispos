@@ -10,7 +10,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { User, InventoryItem, Tab, AuditLog, TabStatus, Room, BusinessType } from '../types';
+import { User, InventoryItem, Tab, AuditLog, TabStatus, Room, BusinessType, Invoice } from '../types';
 
 function cleanData(data: any): any {
   if (data === null || typeof data !== 'object') return data;
@@ -37,6 +37,10 @@ export interface POSData {
   setRooms: (rooms: Room[]) => Promise<void>;
   auditLogs: AuditLog[];
   addAuditLog: (user: User, action: string, details: string) => Promise<void>;
+  invoices: Invoice[];
+  addInvoice: (inv: Invoice) => Promise<void>;
+  updateInvoice: (inv: Invoice) => Promise<void>;
+  deleteInvoice: (id: string) => Promise<void>;
   isOnline: boolean;
   isLoading: boolean;
 }
@@ -72,6 +76,7 @@ export function usePOSData(uid: string, businessType: BusinessType): POSData {
   const [tabs, setTabsState] = useState<Tab[]>(() => LS.get(lsKey('tabs'), []));
   const [rooms, setRoomsState] = useState<Room[]>(() => LS.get(lsKey('rooms'), []));
   const [auditLogs, setAuditLogsState] = useState<AuditLog[]>(() => LS.get(lsKey('auditLogs'), []));
+  const [invoices, setInvoicesState] = useState<Invoice[]>(() => LS.get(lsKey('invoices'), []));
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -79,9 +84,11 @@ export function usePOSData(uid: string, businessType: BusinessType): POSData {
   const tabsRef = useRef<Tab[]>([]);
   const staffRef = useRef<User[]>([]);
   const inventoryRef = useRef<InventoryItem[]>([]);
+  const invoicesRef = useRef<Invoice[]>([]);
   tabsRef.current = tabs;
   staffRef.current = staff;
   inventoryRef.current = inventory;
+  invoicesRef.current = invoices;
 
   const finishLoading = () => {
     if (!loadingDoneRef.current) {
@@ -187,6 +194,20 @@ export function usePOSData(uid: string, businessType: BusinessType): POSData {
     return unsub;
   }, [uid]);
 
+  useEffect(() => {
+    const q = query(userCol('invoices'), orderBy('createdAt', 'desc'), limit(500));
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const docs = snapshot.docs.map(d => d.data() as Invoice);
+        setInvoicesState(docs);
+        LS.set(lsKey('invoices'), docs);
+      },
+      (error) => handleFirestoreError(error, OperationType.LIST, `users/${uid}/invoices`)
+    );
+    return unsub;
+  }, [uid]);
+
   const setStaff = async (newStaff: User[]) => {
     setStaffState(newStaff);
     LS.set(lsKey('staff'), newStaff);
@@ -258,12 +279,31 @@ export function usePOSData(uid: string, businessType: BusinessType): POSData {
     catch (err) { handleFirestoreError(err, OperationType.CREATE, `users/${uid}/auditLogs/${newLog.id}`); }
   };
 
+  const addInvoice = async (inv: Invoice) => {
+    setInvoicesState(prev => [inv, ...prev]);
+    try { await setDoc(userDoc('invoices', inv.id), cleanData(inv)); }
+    catch (err) { handleFirestoreError(err, OperationType.CREATE, `users/${uid}/invoices/${inv.id}`); }
+  };
+
+  const updateInvoice = async (inv: Invoice) => {
+    setInvoicesState(prev => prev.map(i => i.id === inv.id ? inv : i));
+    try { await setDoc(userDoc('invoices', inv.id), cleanData(inv)); }
+    catch (err) { handleFirestoreError(err, OperationType.WRITE, `users/${uid}/invoices/${inv.id}`); }
+  };
+
+  const deleteInvoice = async (id: string) => {
+    setInvoicesState(prev => prev.filter(i => i.id !== id));
+    try { await deleteDoc(userDoc('invoices', id)); }
+    catch (err) { handleFirestoreError(err, OperationType.DELETE, `users/${uid}/invoices/${id}`); }
+  };
+
   return {
     staff, setStaff,
     inventory, setInventory,
     tabs, setTabs, deleteTab,
     rooms, setRooms,
     auditLogs, addAuditLog,
+    invoices, addInvoice, updateInvoice, deleteInvoice,
     isOnline,
     isLoading,
   };

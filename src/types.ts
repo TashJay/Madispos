@@ -97,7 +97,36 @@ export interface BusinessProfile {
   businessName: string;
   businessType: BusinessType;
   ownerName: string;
-  subscriptionStatus: 'active' | 'expired' | 'pending';
+  subscriptionStatus: 'active' | 'expired' | 'pending' | 'trial';
   subscriptionExpiry: number;
+  trialStartDate?: number;
   createdAt: number;
+}
+
+// ── Invoice / Purchase Order types ────────────────────────────────────────────
+
+export type InvoiceStatus = 'draft' | 'sent' | 'received' | 'cancelled';
+
+export interface InvoiceLineItem {
+  id: string;
+  productId?: string;
+  name: string;
+  quantity: number;
+  unitCost: number;
+  total: number;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  supplierName: string;
+  supplierContact?: string;
+  items: InvoiceLineItem[];
+  subtotal: number;
+  total: number;
+  status: InvoiceStatus;
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
+  receivedAt?: number;
 }

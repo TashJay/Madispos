@@ -25,7 +25,7 @@ import { usePOSData } from './hooks/usePOSData';
 import { useAuth } from './hooks/useAuth';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
 import { hashPin } from './lib/crypto';
-import { User, UserRole, TabStatus, Product, TabItem, Tab, ProductType, Room } from './types';
+import { User, UserRole, TabStatus, Product, TabItem, Tab, ProductType, Room, Invoice, InvoiceStatus } from './types';
 import {
   demoStaff, demoInventory, demoTabs, demoAuditLogs, demoRooms,
   DEMO_BUSINESS_NAME, DEMO_BUSINESS_TYPE, DEMO_UID
@@ -112,6 +112,7 @@ export default function App() {
         onLogout={auth.logout}
         error={auth.error}
         clearError={auth.clearError}
+        trialExpired={auth.profile?.subscriptionStatus === 'trial'}
       />
     );
   }
@@ -136,6 +137,8 @@ export default function App() {
         businessName={auth.profile.businessName}
         ownerName={auth.profile.ownerName}
         onLogout={auth.logout}
+        trialDaysLeft={auth.trialDaysLeft}
+        onSubscribeNow={auth.navigateToSubscription}
       />
     );
   }
@@ -178,6 +181,8 @@ interface POSAppProps {
   businessName: string;
   ownerName: string;
   onLogout: () => void;
+  trialDaysLeft?: number | null;
+  onSubscribeNow?: () => void;
   isDemo?: boolean;
   demoData?: {
     staff: User[];
@@ -188,7 +193,7 @@ interface POSAppProps {
   };
 }
 
-function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo = false, demoData }: POSAppProps) {
+function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDaysLeft, onSubscribeNow, isDemo = false, demoData }: POSAppProps) {
   const live = usePOSData(isDemo ? '__skip__' : uid, businessType);
 
   const staff       = isDemo ? (demoData?.staff       ?? []) : live.staff;
@@ -203,6 +208,10 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
   const setRooms    = isDemo ? (_: any) => {}                : live.setRooms;
   const auditLogs   = isDemo ? (demoData?.auditLogs   ?? []) : live.auditLogs;
   const addAuditLog = isDemo ? (_u: any, _a: string, _d: string) => {} : live.addAuditLog;
+  const invoices      = isDemo ? ([] as Invoice[])            : live.invoices;
+  const addInvoice    = isDemo ? async (_: any) => {}         : live.addInvoice;
+  const updateInvoice = isDemo ? async (_: any) => {}         : live.updateInvoice;
+  const deleteInvoice = isDemo ? async (_: string) => {}      : live.deleteInvoice;
   const isOnline    = isDemo ? true                          : live.isOnline;
   const isLoading   = isDemo ? false                         : live.isLoading;
 
@@ -215,7 +224,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
   const [lockoutUntil, setLockoutUntil] = useState(0);
   const [lockoutSecondsLeft, setLockoutSecondsLeft] = useState(0);
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'sales' | 'tabs' | 'inventory' | 'staff' | 'audit' | 'debts' | 'rooms' | 'reports' | 'settings' | 'ai'
+    'dashboard' | 'sales' | 'tabs' | 'inventory' | 'invoices' | 'staff' | 'audit' | 'debts' | 'rooms' | 'reports' | 'settings' | 'ai'
   >('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -254,6 +263,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
   const [showShiftSummary, setShowShiftSummary] = useState(false);
   const [shiftNote, setShiftNote] = useState('');
   const [showCSVImport, setShowCSVImport] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
@@ -719,6 +729,43 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
   const shiftOpenCount = todayTabs.filter(t => String(t.status).toUpperCase() === TabStatus.OPEN).length;
   const shiftDebtTotal = todayTabs.filter(t => String(t.status).toUpperCase() === TabStatus.UNPAID).reduce((s, t) => s + t.total, 0);
 
+  // ── Invoice handlers ──────────────────────────────────────────────────────
+  const handleInvoiceSave = async (inv: Invoice) => {
+    if (invoices.find((i: Invoice) => i.id === inv.id)) {
+      await updateInvoice(inv);
+      addAuditLog(currentUser!, 'Invoice Updated', `Updated ${inv.invoiceNumber} for ${inv.supplierName}`);
+    } else {
+      await addInvoice(inv);
+      addAuditLog(currentUser!, 'Invoice Created', `Created ${inv.invoiceNumber} for ${inv.supplierName}`);
+    }
+    setEditingInvoice(null);
+  };
+
+  const handleInvoiceReceive = async (inv: Invoice) => {
+    const updatedInventory = inventory.map((item: Product) => {
+      const line = inv.items.find(li => li.productId === item.id);
+      if (line) return { ...item, stock: item.stock + line.quantity };
+      return item;
+    });
+    await setInventory(updatedInventory);
+    const received: Invoice = { ...inv, status: 'received', receivedAt: Date.now(), updatedAt: Date.now() };
+    await updateInvoice(received);
+    addAuditLog(currentUser!, 'Invoice Received', `Invoice ${inv.invoiceNumber} from ${inv.supplierName} received — ${inv.items.length} item(s) restocked`);
+    setEditingInvoice(null);
+  };
+
+  const handleInvoiceDelete = (inv: Invoice) => {
+    showConfirm(
+      'Delete Invoice',
+      `Permanently delete invoice ${inv.invoiceNumber}?`,
+      async () => {
+        await deleteInvoice(inv.id);
+        addAuditLog(currentUser!, 'Invoice Deleted', `Deleted invoice ${inv.invoiceNumber}`);
+      },
+      'danger'
+    );
+  };
+
   // ── Main POS render ───────────────────────────────────────────────────────
   return (
     <>
@@ -739,7 +786,29 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
         <button onClick={onLogout} className="underline hover:no-underline">Exit Demo</button>
       </div>
     )}
-    <div className={`h-screen themed-bg-primary flex flex-col md:flex-row overflow-hidden print:hidden ${isDemo ? 'pt-8' : ''}`}>
+    {trialDaysLeft !== null && trialDaysLeft !== undefined && !isDemo && (
+      <div className={`fixed top-0 left-0 right-0 z-[99] flex items-center justify-between px-6 py-2 text-xs font-black print:hidden ${
+        trialDaysLeft <= 3
+          ? 'bg-red-900/95 border-b border-red-500/30 text-red-300'
+          : 'bg-[#07090F]/95 border-b border-amber-500/25 text-amber-400'
+      } backdrop-blur-sm`}>
+        <div className="flex items-center gap-2">
+          <Crown size={12} />
+          <span className="uppercase tracking-widest">
+            {trialDaysLeft === 0
+              ? 'Trial expires today — subscribe to keep your data'
+              : `Free trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} remaining`}
+          </span>
+        </div>
+        <button
+          onClick={onSubscribeNow}
+          className="border border-current px-4 py-1 rounded-full text-[10px] uppercase tracking-widest hover:opacity-70 transition-all"
+        >
+          Subscribe — KSh 1,000/yr
+        </button>
+      </div>
+    )}
+    <div className={`h-screen themed-bg-primary flex flex-col md:flex-row overflow-hidden print:hidden ${isDemo ? 'pt-8' : ''} ${(trialDaysLeft !== null && trialDaysLeft !== undefined && !isDemo) ? 'pt-8' : ''}`}>
 
       {/* Mobile Top Bar */}
       <div className="md:hidden themed-bg-secondary border-b themed-border p-4 flex items-center justify-between shadow-sm">
@@ -810,6 +879,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
               </div>
               <NavItem active={activeTab === 'debts'} icon={CreditCard} label="Unpaid Debts" onClick={() => { setActiveTab('debts'); setIsMobileMenuOpen(false); }} />
               <NavItem active={activeTab === 'inventory'} icon={Package} label="Inventory" onClick={() => { setActiveTab('inventory'); setIsMobileMenuOpen(false); }} />
+              <NavItem active={activeTab === 'invoices'} icon={FileText} label="Invoices" onClick={() => { setActiveTab('invoices'); setIsMobileMenuOpen(false); }} />
             </>
           )}
 
@@ -1158,6 +1228,21 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
               </motion.div>
             )}
 
+            {activeTab === 'invoices' && isManagement && (
+              <motion.div key="invoices" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col">
+                <InvoiceManager
+                  invoices={invoices}
+                  inventory={inventory}
+                  currentUser={currentUser}
+                  onNew={() => setEditingInvoice({ id: 'NEW' } as Invoice)}
+                  onEdit={(inv: Invoice) => setEditingInvoice(inv)}
+                  onReceive={handleInvoiceReceive}
+                  onDelete={handleInvoiceDelete}
+                  onConfirmDialog={showConfirm}
+                />
+              </motion.div>
+            )}
+
             {activeTab === 'staff' && isOwnerOrAdmin && (
               <motion.div key="staff" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col">
                 <StaffManager
@@ -1247,6 +1332,17 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
               currentUser={currentUser}
               onConfirm={handleStaffSave}
               onCancel={() => setEditingStaff(null)}
+            />
+          )}
+
+          {editingInvoice && (
+            <InvoiceModal
+              invoice={editingInvoice.id === 'NEW' ? null : editingInvoice}
+              inventory={inventory}
+              invoiceCount={invoices.length}
+              onSave={handleInvoiceSave}
+              onReceive={handleInvoiceReceive}
+              onCancel={() => setEditingInvoice(null)}
             />
           )}
 
@@ -2001,6 +2097,497 @@ function CSVImportModal({ businessType, existingCategories = [], onImport, onCan
           )}
 
         </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+}
+
+// ── Invoice Manager ────────────────────────────────────────────────────────────
+
+function InvoiceManager({ invoices, inventory, onNew, onEdit, onReceive, onDelete, onConfirmDialog }: any) {
+  const [filter, setFilter] = useState<'all' | 'draft' | 'sent' | 'received' | 'cancelled'>('all');
+
+  const counts = {
+    all: invoices.length,
+    draft: invoices.filter((i: Invoice) => i.status === 'draft').length,
+    sent: invoices.filter((i: Invoice) => i.status === 'sent').length,
+    received: invoices.filter((i: Invoice) => i.status === 'received').length,
+    cancelled: invoices.filter((i: Invoice) => i.status === 'cancelled').length,
+  };
+
+  const filtered = filter === 'all' ? invoices : invoices.filter((i: Invoice) => i.status === filter);
+
+  const statusStyle = (s: string) => {
+    switch (s) {
+      case 'draft':     return 'text-gray-400 bg-gray-500/10 border-gray-500/20';
+      case 'sent':      return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+      case 'received':  return 'text-[#4F6EF6] bg-[#4F6EF6]/10 border-[#4F6EF6]/20';
+      case 'cancelled': return 'text-red-400 bg-red-500/10 border-red-500/20';
+      default:          return 'themed-text-dim';
+    }
+  };
+
+  return (
+    <div className="h-full flex flex-col space-y-8">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h2 className="text-3xl font-black themed-text tracking-tighter">Purchase Invoices</h2>
+          <p className="themed-text-dim text-sm font-medium mt-1">Restock from suppliers — inventory auto-updates on receipt</p>
+        </div>
+        <button
+          onClick={onNew}
+          className="bg-[#4F6EF6] text-white px-8 py-4 rounded-[2rem] font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all shadow-[0_10px_20px_rgba(79,110,246,0.3)]"
+        >
+          <Plus size={18} /> New Invoice
+        </button>
+      </header>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        {(['all', 'draft', 'sent', 'received', 'cancelled'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
+              filter === f
+                ? 'bg-[#4F6EF6] text-white'
+                : 'themed-bg-secondary border themed-border themed-text-dim hover:border-[#4F6EF6]/30'
+            }`}
+          >
+            {f} {counts[f] > 0 && <span className="ml-1 opacity-60">{counts[f]}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div className="luxury-card overflow-hidden flex-1 flex flex-col themed-bg-secondary border themed-border">
+        {filtered.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 py-20">
+            <FileText size={48} className="themed-text-dim opacity-20" />
+            <p className="themed-text-dim font-black text-sm uppercase tracking-widest opacity-40">
+              {filter === 'all' ? 'No invoices yet' : `No ${filter} invoices`}
+            </p>
+            {filter === 'all' && (
+              <button onClick={onNew} className="text-[#4F6EF6] text-xs font-black uppercase tracking-widest hover:underline">
+                Create your first invoice →
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto custom-scrollbar flex-1">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b themed-border text-[10px] themed-text-dim uppercase tracking-[0.2em] font-black bg-black/5">
+                  <th className="py-5 px-6">Invoice</th>
+                  <th className="py-5">Supplier</th>
+                  <th className="py-5">Date</th>
+                  <th className="py-5 text-right">Items</th>
+                  <th className="py-5 text-right">Total</th>
+                  <th className="py-5 text-center">Status</th>
+                  <th className="py-5 px-6 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y themed-border">
+                {filtered.map((inv: Invoice) => (
+                  <tr key={inv.id} className="hover:bg-black/5 transition-colors">
+                    <td className="py-4 px-6">
+                      <p className="font-black themed-text text-sm">{inv.invoiceNumber}</p>
+                      {inv.notes && <p className="themed-text-dim text-[10px] mt-0.5 truncate max-w-[140px]">{inv.notes}</p>}
+                    </td>
+                    <td className="py-4">
+                      <p className="themed-text font-bold text-sm">{inv.supplierName}</p>
+                      {inv.supplierContact && <p className="themed-text-dim text-[10px]">{inv.supplierContact}</p>}
+                    </td>
+                    <td className="py-4 themed-text-dim text-xs">
+                      {new Date(inv.createdAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="py-4 text-right themed-text text-sm font-bold">{inv.items.length}</td>
+                    <td className="py-4 text-right font-mono text-[#4F6EF6] font-black text-sm">
+                      KES {inv.total.toLocaleString()}
+                    </td>
+                    <td className="py-4 text-center">
+                      <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${statusStyle(inv.status)}`}>
+                        {inv.status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => onEdit(inv)}
+                          className="p-2 rounded-xl themed-text-dim hover:text-[#4F6EF6] hover:bg-[#4F6EF6]/5 transition-all"
+                          title="View / Edit"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        {(inv.status === 'draft' || inv.status === 'sent') && (
+                          <button
+                            onClick={() => onConfirmDialog(
+                              'Receive Invoice',
+                              `Mark ${inv.invoiceNumber} as received? Inventory will be restocked automatically for linked items.`,
+                              () => onReceive(inv),
+                              'success'
+                            )}
+                            className="p-2 rounded-xl themed-text-dim hover:text-[#4F6EF6] hover:bg-[#4F6EF6]/5 transition-all"
+                            title="Mark as Received"
+                          >
+                            <CheckCircle2 size={15} />
+                          </button>
+                        )}
+                        {inv.status !== 'received' && (
+                          <button
+                            onClick={() => onDelete(inv)}
+                            className="p-2 rounded-xl themed-text-dim hover:text-red-500 hover:bg-red-500/5 transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Invoice Modal ───────────────────────────────────────────────────────────────
+
+interface LineItemForm {
+  id: string;
+  productId: string;
+  name: string;
+  quantity: number;
+  unitCost: number;
+}
+
+function InvoiceModal({ invoice, inventory, invoiceCount, onSave, onReceive, onCancel }: {
+  invoice: Invoice | null;
+  inventory: any[];
+  invoiceCount: number;
+  onSave: (inv: Invoice) => void;
+  onReceive: (inv: Invoice) => void;
+  onCancel: () => void;
+}) {
+  const isReadOnly = invoice?.status === 'received' || invoice?.status === 'cancelled';
+  const year = new Date().getFullYear();
+  const invoiceNumber = invoice?.invoiceNumber || `INV-${year}-${String(invoiceCount + 1).padStart(4, '0')}`;
+
+  const [supplierName, setSupplierName] = useState(invoice?.supplierName || '');
+  const [supplierContact, setSupplierContact] = useState(invoice?.supplierContact || '');
+  const [notes, setNotes] = useState(invoice?.notes || '');
+  const [lineItems, setLineItems] = useState<LineItemForm[]>(
+    invoice?.items?.length
+      ? invoice.items.map((i: any) => ({ id: i.id, productId: i.productId || '', name: i.name, quantity: i.quantity, unitCost: i.unitCost }))
+      : [{ id: crypto.randomUUID(), productId: '', name: '', quantity: 1, unitCost: 0 }]
+  );
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [productSearch, setProductSearch] = useState('');
+
+  const subtotal = lineItems.reduce((s, i) => s + i.quantity * i.unitCost, 0);
+  const validItems = lineItems.filter(i => i.name.trim());
+
+  const updateItem = (id: string, field: keyof LineItemForm, value: any) =>
+    setLineItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
+
+  const removeItem = (id: string) => {
+    if (lineItems.length > 1) setLineItems(prev => prev.filter(i => i.id !== id));
+  };
+
+  const selectFromInventory = (product: any, itemId: string) => {
+    setLineItems(prev => prev.map(i => i.id === itemId
+      ? { ...i, productId: product.id, name: product.name, unitCost: product.price }
+      : i
+    ));
+    setPickerFor(null);
+    setProductSearch('');
+  };
+
+  const buildInvoice = (status: InvoiceStatus): Invoice => ({
+    id: invoice?.id || crypto.randomUUID(),
+    invoiceNumber,
+    supplierName,
+    supplierContact: supplierContact || undefined,
+    notes: notes || undefined,
+    items: validItems.map(i => ({
+      id: i.id,
+      productId: i.productId || undefined,
+      name: i.name,
+      quantity: i.quantity,
+      unitCost: i.unitCost,
+      total: i.quantity * i.unitCost,
+    })),
+    subtotal,
+    total: subtotal,
+    status,
+    createdAt: invoice?.createdAt || Date.now(),
+    updatedAt: Date.now(),
+    receivedAt: invoice?.receivedAt,
+  });
+
+  const pickerResults = inventory
+    .filter((p: any) => productSearch ? p.name.toLowerCase().includes(productSearch.toLowerCase()) : true)
+    .slice(0, 8);
+
+  const statusColor = (s?: string) => {
+    switch (s) {
+      case 'received':  return 'text-[#4F6EF6] bg-[#4F6EF6]/10 border-[#4F6EF6]/20';
+      case 'sent':      return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
+      case 'cancelled': return 'text-red-400 bg-red-500/10 border-red-500/20';
+      default:          return 'text-gray-400 bg-gray-500/10 border-gray-500/20';
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        className="w-full max-w-2xl themed-bg-secondary border themed-border rounded-[2.5rem] flex flex-col max-h-[92vh] shadow-2xl"
+      >
+        {/* Header */}
+        <div className="p-8 pb-4 shrink-0">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-2xl font-black themed-text tracking-tighter">
+                {!invoice ? 'New Purchase Invoice' : invoiceNumber}
+              </h3>
+              <div className="flex items-center gap-2 mt-1.5">
+                {invoice?.status && (
+                  <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border ${statusColor(invoice.status)}`}>
+                    {invoice.status}
+                  </span>
+                )}
+                {invoice?.receivedAt && (
+                  <span className="text-[10px] themed-text-dim">
+                    Received {new Date(invoice.receivedAt).toLocaleDateString('en-KE', { dateStyle: 'medium' })}
+                  </span>
+                )}
+                {!invoice && <span className="text-[10px] themed-text-dim font-mono">{invoiceNumber}</span>}
+              </div>
+            </div>
+            <button onClick={onCancel} className="p-2 themed-text-dim hover:themed-text transition-colors mt-1">
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-8 pb-4 overflow-y-auto flex-1 custom-scrollbar space-y-6">
+          {/* Supplier */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] themed-text-dim font-black uppercase tracking-widest mb-2">Supplier Name *</label>
+              <input
+                type="text"
+                value={supplierName}
+                onChange={e => setSupplierName(e.target.value)}
+                disabled={isReadOnly}
+                placeholder="e.g. Nairobi Distributors Ltd"
+                className="w-full bg-black/10 border themed-border rounded-2xl px-4 py-3 themed-text text-sm outline-none focus:border-[#4F6EF6]/40 transition-colors disabled:opacity-50 font-medium"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] themed-text-dim font-black uppercase tracking-widest mb-2">Contact (optional)</label>
+              <input
+                type="text"
+                value={supplierContact}
+                onChange={e => setSupplierContact(e.target.value)}
+                disabled={isReadOnly}
+                placeholder="Phone or email"
+                className="w-full bg-black/10 border themed-border rounded-2xl px-4 py-3 themed-text text-sm outline-none focus:border-[#4F6EF6]/40 transition-colors disabled:opacity-50 font-medium"
+              />
+            </div>
+          </div>
+
+          {/* Line items */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-[10px] themed-text-dim font-black uppercase tracking-widest">Items</label>
+              {!isReadOnly && (
+                <button
+                  onClick={() => setLineItems(prev => [...prev, { id: crypto.randomUUID(), productId: '', name: '', quantity: 1, unitCost: 0 }])}
+                  className="flex items-center gap-1.5 text-[10px] text-[#4F6EF6] font-black uppercase tracking-widest hover:opacity-70 transition-all"
+                >
+                  <Plus size={11} /> Add Row
+                </button>
+              )}
+            </div>
+            <div className="rounded-2xl border themed-border overflow-visible">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-black/10 border-b themed-border">
+                    <th className="py-3 px-4 text-left themed-text-dim font-black uppercase tracking-widest">Item</th>
+                    <th className="py-3 px-3 text-right themed-text-dim font-black uppercase tracking-widest w-16">Qty</th>
+                    <th className="py-3 px-3 text-right themed-text-dim font-black uppercase tracking-widest w-28">Unit Cost</th>
+                    <th className="py-3 px-4 text-right themed-text-dim font-black uppercase tracking-widest w-24">Total</th>
+                    {!isReadOnly && <th className="py-3 px-3 w-8" />}
+                  </tr>
+                </thead>
+                <tbody className="divide-y themed-border">
+                  {lineItems.map(item => (
+                    <tr key={item.id}>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={e => updateItem(item.id, 'name', e.target.value)}
+                            disabled={isReadOnly}
+                            placeholder="Item name"
+                            className="flex-1 bg-transparent themed-text font-medium outline-none placeholder:opacity-30 text-sm disabled:opacity-60"
+                          />
+                          {!isReadOnly && (
+                            <div className="relative">
+                              <button
+                                onClick={() => { setPickerFor(pickerFor === item.id ? null : item.id); setProductSearch(''); }}
+                                className="text-[#4F6EF6]/30 hover:text-[#4F6EF6] transition-colors"
+                                title="Pick from inventory"
+                              >
+                                <Package size={13} />
+                              </button>
+                              {pickerFor === item.id && (
+                                <div className="absolute left-0 top-7 z-[60] w-60 themed-bg-secondary border themed-border rounded-2xl shadow-2xl overflow-hidden">
+                                  <div className="p-2">
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      value={productSearch}
+                                      onChange={e => setProductSearch(e.target.value)}
+                                      placeholder="Search inventory..."
+                                      className="w-full bg-black/10 border themed-border rounded-xl px-3 py-2 text-xs themed-text outline-none"
+                                    />
+                                  </div>
+                                  <div className="max-h-44 overflow-y-auto">
+                                    {pickerResults.length === 0
+                                      ? <p className="px-4 py-3 text-xs themed-text-dim">No matches</p>
+                                      : pickerResults.map((p: any) => (
+                                          <button
+                                            key={p.id}
+                                            onClick={() => selectFromInventory(p, item.id)}
+                                            className="w-full text-left px-4 py-2.5 hover:bg-[#4F6EF6]/8 transition-colors"
+                                          >
+                                            <p className="text-xs themed-text font-bold">{p.name}</p>
+                                            <p className="text-[10px] themed-text-dim">{p.category} · KES {p.price.toLocaleString()}</p>
+                                          </button>
+                                        ))
+                                    }
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {item.productId && <p className="text-[9px] text-[#4F6EF6]/50 mt-0.5 pl-0">linked to inventory</p>}
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <input
+                          type="number" min="1"
+                          value={item.quantity}
+                          onChange={e => updateItem(item.id, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
+                          disabled={isReadOnly}
+                          className="w-14 bg-transparent themed-text font-bold text-right outline-none disabled:opacity-60"
+                        />
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <input
+                          type="number" min="0"
+                          value={item.unitCost}
+                          onChange={e => updateItem(item.id, 'unitCost', parseFloat(e.target.value) || 0)}
+                          disabled={isReadOnly}
+                          className="w-24 bg-transparent font-mono text-[#4F6EF6] font-bold text-right outline-none disabled:opacity-60"
+                        />
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-[#4F6EF6] font-black">
+                        {(item.quantity * item.unitCost).toLocaleString()}
+                      </td>
+                      {!isReadOnly && (
+                        <td className="py-3 px-3 text-center">
+                          <button
+                            onClick={() => removeItem(item.id)}
+                            disabled={lineItems.length === 1}
+                            className="themed-text-dim hover:text-red-400 transition-colors disabled:opacity-20"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-[10px] themed-text-dim font-black uppercase tracking-widest mb-2">Notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              disabled={isReadOnly}
+              placeholder="Payment terms, delivery date, PO reference..."
+              rows={2}
+              className="w-full bg-black/10 border themed-border rounded-2xl px-4 py-3 themed-text text-sm outline-none focus:border-[#4F6EF6]/40 transition-colors resize-none disabled:opacity-50 font-medium"
+            />
+          </div>
+
+          {/* Total */}
+          <div className="bg-[#4F6EF6]/5 border border-[#4F6EF6]/15 rounded-2xl p-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-black themed-text-dim uppercase tracking-widest">Invoice Total</p>
+              <p className="text-[10px] themed-text-dim mt-0.5">
+                {validItems.filter(i => i.productId).length}/{validItems.length} items linked to inventory
+              </p>
+            </div>
+            <p className="text-2xl font-black font-mono text-[#4F6EF6]">KES {subtotal.toLocaleString()}</p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="p-8 pt-4 shrink-0 flex gap-3 flex-wrap border-t themed-border">
+          <button onClick={onCancel} className="px-6 py-3.5 bg-black/5 themed-text-dim border themed-border rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black/10 transition-all">
+            {isReadOnly ? 'Close' : 'Cancel'}
+          </button>
+
+          {!isReadOnly && (
+            <>
+              <button
+                onClick={() => onSave(buildInvoice('draft'))}
+                disabled={!supplierName.trim()}
+                className="flex-1 px-6 py-3.5 border themed-border themed-text rounded-2xl font-black text-xs uppercase tracking-widest hover:border-[#4F6EF6]/40 transition-all disabled:opacity-30"
+              >
+                Save Draft
+              </button>
+              <button
+                onClick={() => onSave(buildInvoice('sent'))}
+                disabled={!supplierName.trim() || validItems.length === 0}
+                className="flex-1 px-6 py-3.5 border border-amber-500/25 text-amber-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-500/5 transition-all disabled:opacity-30"
+              >
+                Mark Sent
+              </button>
+              <button
+                onClick={() => onReceive(buildInvoice('received'))}
+                disabled={!supplierName.trim() || validItems.length === 0}
+                className="flex-1 px-6 py-3.5 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 shadow-[0_8px_20px_rgba(79,110,246,0.3)] flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 size={14} /> Receive &amp; Restock
+              </button>
+            </>
+          )}
+
+          {isReadOnly && invoice?.status === 'sent' && (
+            <button
+              onClick={() => onReceive(invoice)}
+              className="flex-1 px-6 py-3.5 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-all shadow-[0_8px_20px_rgba(79,110,246,0.3)] flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 size={14} /> Receive &amp; Restock
+            </button>
+          )}
+        </div>
       </motion.div>
     </div>
   );

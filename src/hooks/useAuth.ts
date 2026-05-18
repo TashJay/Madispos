@@ -21,12 +21,14 @@ export interface AuthState {
   screen: AuthScreen;
   isLoading: boolean;
   error: string;
+  trialDaysLeft: number | null;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   activateSubscription: () => Promise<void>;
   saveBusinessProfile: (businessName: string, businessType: BusinessType, ownerName: string, ownerPin?: string) => Promise<void>;
+  navigateToSubscription: () => void;
   clearError: () => void;
 }
 
@@ -57,7 +59,28 @@ export function useAuth(): AuthState {
         const p = await loadProfile(user);
         setProfile(p);
         if (!p) {
-          setScreen('subscription');
+          // New user — start 14-day free trial
+          const trialProfile: Partial<BusinessProfile> = {
+            uid: user.uid,
+            email: user.email || '',
+            subscriptionStatus: 'trial',
+            trialStartDate: Date.now(),
+            createdAt: Date.now(),
+          } as any;
+          try {
+            await setDoc(doc(db, 'users', user.uid), trialProfile, { merge: true });
+            setProfile(trialProfile as BusinessProfile);
+            setScreen('business-select');
+          } catch {
+            setScreen('subscription');
+          }
+        } else if (p.subscriptionStatus === 'trial') {
+          const trialAge = (Date.now() - (p.trialStartDate || p.createdAt || Date.now())) / (1000 * 60 * 60 * 24);
+          if (trialAge < 14) {
+            setScreen(p.businessType ? 'pos' : 'business-select');
+          } else {
+            setScreen('subscription');
+          }
         } else if (p.subscriptionStatus !== 'active') {
           setScreen('subscription');
         } else if (!p.businessType) {
@@ -116,7 +139,7 @@ export function useAuth(): AuthState {
       email: firebaseUser.email || '',
       subscriptionStatus: 'active',
       subscriptionExpiry: expiry,
-      createdAt: Date.now(),
+      createdAt: profile?.createdAt || Date.now(),
     };
     try {
       await setDoc(doc(db, 'users', firebaseUser.uid), partial, { merge: true });
@@ -126,8 +149,11 @@ export function useAuth(): AuthState {
       return;
     }
     setProfile(prev => ({ ...prev, ...partial } as BusinessProfile));
-    setScreen('business-select');
+    // If upgrading from trial (businessType already set), go straight to POS
+    setScreen(profile?.businessType ? 'pos' : 'business-select');
   };
+
+  const navigateToSubscription = () => setScreen('subscription');
 
   const saveBusinessProfile = async (businessName: string, businessType: BusinessType, ownerName: string, ownerPin?: string) => {
     if (!firebaseUser) return;
@@ -156,18 +182,25 @@ export function useAuth(): AuthState {
 
   const clearError = () => setError('');
 
+  const trialDaysLeft: number | null =
+    profile && profile.subscriptionStatus === 'trial'
+      ? Math.max(0, 14 - Math.floor((Date.now() - (profile.trialStartDate || profile.createdAt || Date.now())) / (1000 * 60 * 60 * 24)))
+      : null;
+
   return {
     firebaseUser,
     profile,
     screen,
     isLoading,
     error,
+    trialDaysLeft,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
     logout,
     activateSubscription,
     saveBusinessProfile,
+    navigateToSubscription,
     clearError,
   };
 }

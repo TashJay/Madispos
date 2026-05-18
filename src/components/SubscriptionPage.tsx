@@ -10,6 +10,7 @@ interface Props {
   onLogout: () => void;
   error?: string;
   clearError?: () => void;
+  trialExpired?: boolean;
 }
 
 const features = [
@@ -25,7 +26,7 @@ const features = [
 
 type PayMethod = 'mpesa' | 'card';
 
-export function SubscriptionPage({ email, onActivate, onLogout, error, clearError }: Props) {
+export function SubscriptionPage({ email, onActivate, onLogout, error, clearError, trialExpired }: Props) {
   const [payMethod, setPayMethod] = useState<PayMethod>('mpesa');
   const [phone, setPhone] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -86,6 +87,12 @@ export function SubscriptionPage({ email, onActivate, onLogout, error, clearErro
             <motion.div key="plan" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
               <div className="bg-[#0C1220] border border-[#4F6EF6]/20 rounded-2xl sm:rounded-3xl p-5 sm:p-7 mb-4">
                 <div className="text-center mb-5 sm:mb-6">
+                  {trialExpired && (
+                    <div className="mb-4 px-4 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                      <p className="text-amber-400 text-xs font-black uppercase tracking-widest">Your 14-day free trial has ended</p>
+                      <p className="text-amber-400/60 text-[10px] mt-0.5">Subscribe to keep your data and continue using MADIS</p>
+                    </div>
+                  )}
                   <p className="text-white/35 text-xs uppercase tracking-widest mb-3">Annual Subscription</p>
                   <div className="flex items-end justify-center gap-2">
                     <span className="text-4xl sm:text-5xl font-black text-white">KSh 1,000</span>
