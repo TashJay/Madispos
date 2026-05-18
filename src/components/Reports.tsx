@@ -39,7 +39,7 @@ interface ReportsProps {
   staff: any[];
 }
 
-const COLORS = ['#00FF88', '#D4AF37', '#3B82F6', '#EF4444', '#8B5CF6', '#F59E0B'];
+const COLORS = ['#4F6EF6', '#D4AF37', '#3B82F6', '#EF4444', '#8B5CF6', '#F59E0B'];
 
 export const Reports: React.FC<ReportsProps> = ({ tabs, inventory, staff }) => {
   const stats = useMemo(() => {
@@ -125,7 +125,7 @@ export const Reports: React.FC<ReportsProps> = ({ tabs, inventory, staff }) => {
         {/* Category Distribution */}
         <div className="luxury-card p-8 themed-bg-secondary border themed-border">
           <h3 className="text-xl font-black themed-text mb-8 flex items-center gap-3">
-             <PieChartIcon size={20} className="text-neon-green" />
+             <PieChartIcon size={20} className="text-[#4F6EF6]" />
              Revenue by Category
           </h3>
           <div className="h-[300px] w-full">
@@ -164,7 +164,7 @@ export const Reports: React.FC<ReportsProps> = ({ tabs, inventory, staff }) => {
         {/* Staff Performance */}
         <div className="luxury-card p-8 themed-bg-secondary border themed-border">
           <h3 className="text-xl font-black themed-text mb-8 flex items-center gap-3">
-             <Users size={20} className="text-neon-green" />
+             <Users size={20} className="text-[#4F6EF6]" />
              Staff Performance (Today)
           </h3>
           <div className="h-[300px] w-full">
@@ -194,7 +194,7 @@ export const Reports: React.FC<ReportsProps> = ({ tabs, inventory, staff }) => {
       {/* Inventory Health Summary */}
       <div className="luxury-card p-8 themed-bg-secondary border themed-border">
          <h3 className="text-xl font-black themed-text mb-8 flex items-center gap-3">
-             <Package size={20} className="text-neon-green" />
+             <Package size={20} className="text-[#4F6EF6]" />
              Stock Health Overview
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -225,9 +225,9 @@ function StatCard({ label, value, trend, positive, icon: Icon }: any) {
     <div className="luxury-card p-6 themed-bg-secondary border themed-border flex flex-col justify-between h-36">
       <div className="flex justify-between items-start">
         <div className="p-2 bg-black/5 border themed-border rounded-lg">
-          <Icon size={18} className="text-neon-green" />
+          <Icon size={18} className="text-[#4F6EF6]" />
         </div>
-        <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${positive ? 'text-neon-green' : 'text-red-500'}`}>
+        <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${positive ? 'text-[#4F6EF6]' : 'text-red-500'}`}>
           {positive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
           {trend}
         </div>

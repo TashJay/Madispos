@@ -1,104 +1,102 @@
 @import "tailwindcss";
 
 @theme {
-  --color-neon-green: #00FF88;
+  --color-accent: #4F6EF6;
+  --color-accent-hover: #3D5CE4;
 }
 
 /* ── Dark mode (default) themed utilities ──────────────────────────────── */
 .themed-bg-primary {
-  background-color: #0d0d0d;
-  color: #f0f0f0;
+  background-color: #0C1220;
+  color: #E8EEF9;
 }
 
 .themed-bg-secondary {
-  background-color: #161616;
-  color: #f0f0f0;
+  background-color: #111827;
+  color: #E8EEF9;
 }
 
 .themed-text {
-  color: #f0f0f0;
+  color: #E8EEF9;
 }
 
 .themed-text-dim {
-  color: #888888;
+  color: #6B7A9B;
 }
 
 .themed-border {
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.07);
 }
 
 /* ── Light mode overrides (body.light) ─────────────────────────────────── */
 body.light .themed-bg-primary {
-  background-color: #f4f4f5;
-  color: #111111;
+  background-color: #F4F6FB;
+  color: #111827;
 }
 
 body.light .themed-bg-secondary {
-  background-color: #ffffff;
-  color: #111111;
+  background-color: #FFFFFF;
+  color: #111827;
 }
 
 body.light .themed-text {
-  color: #111111;
+  color: #111827;
 }
 
 body.light .themed-text-dim {
-  color: #666666;
+  color: #6B7A9B;
 }
 
 body.light .themed-border {
-  border-color: rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
 /* ── Component classes ─────────────────────────────────────────────────── */
 .luxury-card {
-  background-color: #161616;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 1.5rem;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 body.light .luxury-card {
   background-color: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
 }
 
 .glass-panel {
   background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 1.5rem;
 }
 
 body.light .glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(0, 0, 0, 0.07);
 }
+
+/* ── Accent shorthand ──────────────────────────────────────────────────── */
+.text-accent        { color: #4F6EF6; }
+.bg-accent          { background-color: #4F6EF6; }
+.border-accent      { border-color: #4F6EF6; }
+.hover\:bg-accent:hover { background-color: #3D5CE4; }
 
 /* ── Custom scrollbar ──────────────────────────────────────────────────── */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 136, 0.2);
+  background: rgba(79, 110, 246, 0.25);
   border-radius: 999px;
 }
-
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 136, 0.4);
+  background: rgba(79, 110, 246, 0.45);
 }
 
 /* ── Base resets ───────────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body, #root {
   height: 100%;
@@ -108,35 +106,21 @@ html, body, #root {
 }
 
 body {
-  background-color: #0d0d0d;
-  color: #f0f0f0;
+  background-color: #07090F;
+  color: #E8EEF9;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body.light {
-  background-color: #f4f4f5;
-  color: #111111;
+  background-color: #F4F6FB;
+  color: #111827;
 }
 
 /* ── Print styles ──────────────────────────────────────────────────────── */
 @media print {
-  @page {
-    size: 80mm auto;
-    margin: 0;
-  }
-
-  html, body {
-    width: 80mm;
-    background: #fff !important;
-    color: #000 !important;
-  }
-
-  .print\:hidden {
-    display: none !important;
-  }
-
-  .print\:block {
-    display: block !important;
-  }
+  @page { size: 80mm auto; margin: 0; }
+  html, body { width: 80mm; background: #fff !important; color: #000 !important; }
+  .print\:hidden { display: none !important; }
+  .print\:block  { display: block !important; }
 }

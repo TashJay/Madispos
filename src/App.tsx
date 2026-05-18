@@ -5,7 +5,7 @@ import {
   Settings, CreditCard, ClipboardList, Package, Users,
   History, Wifi, WifiOff, X, Check, Save, RotateCcw,
   Sun, Moon, Zap, Crown, Eye, EyeOff, ArrowDown, Printer,
-  TrendingUp, Trash2, FileText, Download, Share, BarChart2
+  TrendingUp, Trash2, FileText, Download, Share, BarChart2, Play
 } from 'lucide-react';
 import { PinPad } from './components/PinPad';
 import { TransactionModal } from './components/TransactionModal';
@@ -22,22 +22,41 @@ import { useAuth } from './hooks/useAuth';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
 import { hashPin } from './lib/crypto';
 import { User, UserRole, TabStatus, Product, TabItem, Tab, ProductType, Room } from './types';
+import {
+  demoStaff, demoInventory, demoTabs, demoAuditLogs, demoRooms,
+  DEMO_BUSINESS_NAME, DEMO_BUSINESS_TYPE, DEMO_UID
+} from './demo/demoData';
 
 // ── Top-level router ──────────────────────────────────────────────────────────
 export default function App() {
   const auth = useAuth();
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
+  if (isDemoMode) {
+    return (
+      <POSApp
+        uid={DEMO_UID}
+        businessType={DEMO_BUSINESS_TYPE}
+        businessName={DEMO_BUSINESS_NAME}
+        ownerName="Demo Owner"
+        onLogout={() => setIsDemoMode(false)}
+        isDemo={true}
+        demoData={{ staff: demoStaff, inventory: demoInventory, tabs: demoTabs, auditLogs: demoAuditLogs, rooms: demoRooms }}
+      />
+    );
+  }
 
   if (auth.isLoading) {
     return (
-      <div className="h-screen bg-[#080808] flex flex-col items-center justify-center">
-        <div className="w-10 h-10 border-4 border-[#00FF88]/20 border-t-[#00FF88] rounded-full animate-spin mb-4" />
+      <div className="h-screen bg-[#07090F] flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-4 border-[#4F6EF6]/20 border-t-[#4F6EF6] rounded-full animate-spin mb-4" />
         <p className="text-[10px] text-white/30 uppercase tracking-[0.3em] font-black animate-pulse">Loading MADIS...</p>
       </div>
     );
   }
 
   if (auth.screen === 'landing' || auth.screen === 'auth') {
-    return <LandingPageRouter auth={auth} />;
+    return <LandingPageRouter auth={auth} onDemo={() => setIsDemoMode(true)} />;
   }
 
   if (auth.screen === 'subscription') {
@@ -72,13 +91,12 @@ export default function App() {
     );
   }
 
-  // Fallback — show landing with proper handlers
   return (
-    <LandingPageRouter auth={auth} />
+    <LandingPageRouter auth={auth} onDemo={() => setIsDemoMode(true)} />
   );
 }
 
-function LandingPageRouter({ auth }: { auth: any }) {
+function LandingPageRouter({ auth, onDemo }: { auth: any; onDemo: () => void }) {
   const [authMode, setAuthMode] = useState<'hidden' | 'signin' | 'signup'>('hidden');
 
   if (authMode !== 'hidden') {
@@ -99,6 +117,7 @@ function LandingPageRouter({ auth }: { auth: any }) {
     <LandingPage
       onGetStarted={() => setAuthMode('signup')}
       onSignIn={() => setAuthMode('signin')}
+      onDemo={onDemo}
     />
   );
 }
@@ -110,19 +129,33 @@ interface POSAppProps {
   businessName: string;
   ownerName: string;
   onLogout: () => void;
+  isDemo?: boolean;
+  demoData?: {
+    staff: User[];
+    inventory: Product[];
+    tabs: Tab[];
+    auditLogs: any[];
+    rooms: Room[];
+  };
 }
 
-function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSAppProps) {
-  const {
-    staff, setStaff,
-    inventory, setInventory,
-    tabs, setTabs, deleteTab,
-    rooms, setRooms,
-    auditLogs,
-    addAuditLog,
-    isOnline,
-    isLoading,
-  } = usePOSData(uid, businessType);
+function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo = false, demoData }: POSAppProps) {
+  const live = usePOSData(isDemo ? '__skip__' : uid, businessType);
+
+  const staff       = isDemo ? (demoData?.staff       ?? []) : live.staff;
+  const setStaff    = isDemo ? (_: any) => {}                : live.setStaff;
+  const inventory   = isDemo ? (demoData?.inventory   ?? []) : live.inventory;
+  const setInventory= isDemo ? (_: any) => {}                : live.setInventory;
+  const [demoTabs,  setDemoTabsState] = useState<Tab[]>(demoData?.tabs ?? []);
+  const tabs        = isDemo ? demoTabs                      : live.tabs;
+  const setTabs     = isDemo ? setDemoTabsState              : live.setTabs;
+  const deleteTab   = isDemo ? (_: string) => {}             : live.deleteTab;
+  const rooms       = isDemo ? (demoData?.rooms       ?? []) : live.rooms;
+  const setRooms    = isDemo ? (_: any) => {}                : live.setRooms;
+  const auditLogs   = isDemo ? (demoData?.auditLogs   ?? []) : live.auditLogs;
+  const addAuditLog = isDemo ? (_u: any, _a: string, _d: string) => {} : live.addAuditLog;
+  const isOnline    = isDemo ? true                          : live.isOnline;
+  const isLoading   = isDemo ? false                         : live.isLoading;
 
   const { canInstall, isIOS, isInstalled, triggerInstall } = useInstallPrompt();
 
@@ -524,7 +557,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
   if (isLoading) {
     return (
       <div className="h-screen themed-bg-primary flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-neon-green/30 border-t-neon-green rounded-full animate-spin mb-4" />
+        <div className="w-12 h-12 border-4 border-[#4F6EF6]/30 border-t-[#4F6EF6] rounded-full animate-spin mb-4" />
         <p className="text-[10px] themed-text-dim uppercase tracking-[0.3em] font-black animate-pulse">
           Syncing {businessName}...
         </p>
@@ -540,14 +573,20 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="w-16 h-16 bg-neon-green rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(0,255,136,0.3)] mb-4"
+            className="w-16 h-16 bg-[#4F6EF6] rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(79,110,246,0.4)] mb-4"
           >
-            <BarChart2 size={32} className="text-black" />
+            <BarChart2 size={32} className="text-white" />
           </motion.div>
           <h1 className="text-3xl font-black themed-text tracking-tighter">MADIS</h1>
-          <p className="text-[10px] text-neon-green font-mono uppercase tracking-[0.3em]">{businessName}</p>
+          <p className="text-[10px] text-[#4F6EF6] font-mono uppercase tracking-[0.3em]">{businessName}</p>
         </div>
-        <PinPad onSuccess={handleLogin} error={loginError} isOnline={isOnline} />
+        <PinPad onSuccess={handleLogin} error={loginError} isOnline={isOnline} businessName={businessName} />
+        {isDemo && (
+          <div className="mt-6 flex items-center gap-2 bg-[#4F6EF6]/10 border border-[#4F6EF6]/25 rounded-xl px-4 py-2.5 text-xs text-[#4F6EF6]/80">
+            <Play size={12} fill="currentColor" />
+            Demo mode — PIN is <strong className="text-[#4F6EF6]">1234</strong> (owner) · <strong>2222</strong> (supervisor) · <strong>3333</strong> (staff)
+          </div>
+        )}
 
         <button
           onClick={onLogout}
@@ -587,13 +626,22 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
         staffName={staff.find(s => s.id === printingTab.staffId)?.name || 'Terminal'}
       />
     )}
-    <div className="h-screen themed-bg-primary flex flex-col md:flex-row overflow-hidden print:hidden">
+    {isDemo && (
+      <div className="fixed top-0 left-0 right-0 z-[100] bg-[#4F6EF6] text-white text-xs font-bold flex items-center justify-between px-4 py-2 print:hidden">
+        <span className="flex items-center gap-2">
+          <Play size={12} fill="white" />
+          DEMO MODE — Data is simulated. No changes are saved.
+        </span>
+        <button onClick={onLogout} className="underline hover:no-underline">Exit Demo</button>
+      </div>
+    )}
+    <div className={`h-screen themed-bg-primary flex flex-col md:flex-row overflow-hidden print:hidden ${isDemo ? 'pt-8' : ''}`}>
 
       {/* Mobile Top Bar */}
       <div className="md:hidden themed-bg-secondary border-b themed-border p-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-neon-green rounded-lg flex items-center justify-center shadow-lg">
-            <BarChart2 size={16} className="text-black" />
+          <div className="w-8 h-8 bg-[#4F6EF6] rounded-lg flex items-center justify-center shadow-lg">
+            <BarChart2 size={16} className="text-white" />
           </div>
           <div>
             <h1 className="font-black text-sm tracking-tighter themed-text leading-none">MADIS</h1>
@@ -624,8 +672,8 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
       <aside className={`fixed inset-0 z-40 md:relative md:flex w-full md:w-64 border-r themed-border themed-bg-secondary flex-col shrink-0 transition-transform duration-300 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full shadow-2xl md:shadow-none'}`}>
         <div className="p-6 border-b themed-border flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-neon-green rounded-xl flex items-center justify-center shadow-[0_5px_15px_rgba(0,255,136,0.3)]">
-              <BarChart2 size={22} className="text-black" />
+            <div className="w-10 h-10 bg-[#4F6EF6] rounded-xl flex items-center justify-center shadow-[0_5px_15px_rgba(79,110,246,0.35)]">
+              <BarChart2 size={22} className="text-white" />
             </div>
             <div>
               <h1 className="font-black text-base tracking-tighter themed-text leading-none">MADIS</h1>
@@ -677,16 +725,16 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
           {(canInstall || isIOS) && !isInstalled && (
             <button
               onClick={isIOS ? () => setShowIOSInstall(true) : triggerInstall}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-neon-green/5 border border-neon-green/10 rounded-2xl hover:bg-neon-green/10 transition-all"
+              className="w-full flex items-center gap-3 px-4 py-3 bg-[#4F6EF6]/5 border border-[#4F6EF6]/10 rounded-2xl hover:bg-[#4F6EF6]/10 transition-all"
             >
-              <Download size={16} className="text-neon-green" />
-              <span className="text-xs font-black text-neon-green uppercase tracking-widest">Install App</span>
+              <Download size={16} className="text-[#4F6EF6]" />
+              <span className="text-xs font-black text-[#4F6EF6] uppercase tracking-widest">Install App</span>
             </button>
           )}
 
           <div className="flex items-center justify-between px-4">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-neon-green' : 'bg-red-500'}`} />
+              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-[#4F6EF6]' : 'bg-red-500'}`} />
               {isOnline
                 ? <Wifi size={14} className="themed-text-dim" />
                 : <WifiOff size={14} className="themed-text-dim" />
@@ -703,8 +751,8 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
 
           <div className="px-4 py-3 bg-black/5 rounded-2xl border themed-border">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-neon-green/10 rounded-xl flex items-center justify-center border border-neon-green/20">
-                <UserIcon size={14} className="text-neon-green" />
+              <div className="w-8 h-8 bg-[#4F6EF6]/10 rounded-xl flex items-center justify-center border border-[#4F6EF6]/20">
+                <UserIcon size={14} className="text-[#4F6EF6]" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-black themed-text truncate">{currentUser.name}</p>
@@ -743,23 +791,23 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
           <div className="sticky top-0 z-30 themed-bg-secondary border-b themed-border px-6 py-3 flex items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-neon-green animate-pulse' : 'bg-red-500'}`} />
+                <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-[#4F6EF6] animate-pulse' : 'bg-red-500'}`} />
                 <span className="text-[9px] themed-text-dim uppercase font-black tracking-[0.2em] hidden sm:block">
                   {isOnline ? 'Live Data' : 'Offline Mode'}
                 </span>
               </div>
               <div className="hidden sm:flex items-center gap-4 text-[10px] font-black themed-text-dim uppercase tracking-[0.15em]">
-                <span>Today: <span className="text-neon-green">KES {shiftRevenue.toLocaleString()}</span></span>
+                <span>Today: <span className="text-[#4F6EF6]">KES {shiftRevenue.toLocaleString()}</span></span>
                 <span>Tabs: <span className="themed-text">{shiftOpenCount}</span></span>
                 {shiftDebtTotal > 0 && <span>Debts: <span className="text-red-500">KES {shiftDebtTotal.toLocaleString()}</span></span>}
               </div>
             </div>
             <button
               onClick={() => setShowShiftSummary(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-neon-green/10 border border-neon-green/20 rounded-xl hover:bg-neon-green/20 transition-all"
+              className="flex items-center gap-2 px-4 py-2 bg-[#4F6EF6]/10 border border-[#4F6EF6]/20 rounded-xl hover:bg-[#4F6EF6]/20 transition-all"
             >
-              <FileText size={14} className="text-neon-green" />
-              <span className="text-[9px] text-neon-green font-black uppercase tracking-widest hidden sm:block">Close Shift</span>
+              <FileText size={14} className="text-[#4F6EF6]" />
+              <span className="text-[9px] text-[#4F6EF6] font-black uppercase tracking-widest hidden sm:block">Close Shift</span>
             </button>
           </div>
         )}
@@ -773,7 +821,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                   inventory={inventory}
                   staff={staff}
                   currentUser={currentUser}
-                  isManagement={isManagement}
+                  businessName={businessName}
                   onNavigate={(tab) => setActiveTab(tab as any)}
                 />
               </motion.div>
@@ -791,7 +839,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                           key={item.id}
                           onClick={() => addToCart(item)}
                           disabled={item.stock === 0 && item.type !== ProductType.SERVICE}
-                          className="px-4 py-2 bg-neon-green/10 border border-neon-green/20 text-neon-green rounded-xl text-xs font-black hover:bg-neon-green/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="px-4 py-2 bg-[#4F6EF6]/10 border border-[#4F6EF6]/20 text-[#4F6EF6] rounded-xl text-xs font-black hover:bg-[#4F6EF6]/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           {item.name}
                         </button>
@@ -808,13 +856,13 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
                       placeholder="Search products..."
-                      className="w-full themed-bg-secondary border themed-border rounded-2xl py-3 pl-10 pr-4 themed-text focus:outline-none focus:border-neon-green/40 transition-all text-sm"
+                      className="w-full themed-bg-secondary border themed-border rounded-2xl py-3 pl-10 pr-4 themed-text focus:outline-none focus:border-[#4F6EF6]/40 transition-all text-sm"
                     />
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={() => setSelectedCategory(null)}
-                      className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${!selectedCategory ? 'bg-neon-green text-black' : 'themed-bg-secondary border themed-border themed-text-dim hover:themed-text'}`}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${!selectedCategory ? 'bg-[#4F6EF6] text-white' : 'themed-bg-secondary border themed-border themed-text-dim hover:themed-text'}`}
                     >
                       All
                     </button>
@@ -822,7 +870,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                       <button
                         key={cat}
                         onClick={() => setSelectedCategory(cat === selectedCategory ? null : cat)}
-                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${selectedCategory === cat ? 'bg-neon-green text-black' : 'themed-bg-secondary border themed-border themed-text-dim hover:themed-text'}`}
+                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${selectedCategory === cat ? 'bg-[#4F6EF6] text-white' : 'themed-bg-secondary border themed-border themed-text-dim hover:themed-text'}`}
                       >
                         {cat}
                       </button>
@@ -837,15 +885,15 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                       key={item.id}
                       onClick={() => addToCart(item)}
                       disabled={item.stock === 0 && item.type !== ProductType.SERVICE}
-                      className="p-4 themed-bg-secondary border themed-border rounded-2xl text-left hover:border-neon-green/30 transition-all group disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                      className="p-4 themed-bg-secondary border themed-border rounded-2xl text-left hover:border-[#4F6EF6]/30 transition-all group disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
                     >
                       <div className="flex items-start justify-between mb-3">
-                        <p className="font-black themed-text text-sm leading-tight group-hover:text-neon-green transition-colors">{item.name}</p>
+                        <p className="font-black themed-text text-sm leading-tight group-hover:text-[#4F6EF6] transition-colors">{item.name}</p>
                         {item.stock < 10 && item.type !== ProductType.SERVICE && (
                           <span className="text-[8px] text-red-500 font-black uppercase">Low</span>
                         )}
                       </div>
-                      <p className="text-neon-green font-black text-lg font-mono">KES {item.price.toLocaleString()}</p>
+                      <p className="text-[#4F6EF6] font-black text-lg font-mono">KES {item.price.toLocaleString()}</p>
                       <p className="text-[10px] themed-text-dim mt-1">{item.category} · Stock: {item.stock}</p>
                     </button>
                   ))}
@@ -857,7 +905,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-[9px] themed-text-dim uppercase font-black tracking-widest">Current Order ({cart.length} items)</p>
                       <div className="flex gap-2">
-                        <button onClick={printCurrentCart} className="p-2 themed-text-dim hover:text-neon-green transition-colors" title="Print preliminary receipt">
+                        <button onClick={printCurrentCart} className="p-2 themed-text-dim hover:text-[#4F6EF6] transition-colors" title="Print preliminary receipt">
                           <Printer size={16} />
                         </button>
                         <button onClick={clearCart} className="p-2 text-red-500/50 hover:text-red-500 transition-colors">
@@ -877,7 +925,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                           </div>
                           <button
                             onClick={() => isManagement ? setOverrideItem(item) : null}
-                            className={`font-black text-neon-green font-mono shrink-0 ${isManagement ? 'hover:underline cursor-pointer' : ''}`}
+                            className={`font-black text-[#4F6EF6] font-mono shrink-0 ${isManagement ? 'hover:underline cursor-pointer' : ''}`}
                           >
                             KES {(item.priceAtSale * item.quantity).toLocaleString()}
                           </button>
@@ -891,25 +939,25 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                         value={customerName}
                         onChange={e => setCustomerName(e.target.value)}
                         placeholder="Customer name..."
-                        className="flex-1 themed-bg-primary border themed-border rounded-xl py-2.5 px-4 themed-text text-sm focus:outline-none focus:border-neon-green/40 transition-all"
+                        className="flex-1 themed-bg-primary border themed-border rounded-xl py-2.5 px-4 themed-text text-sm focus:outline-none focus:border-[#4F6EF6]/40 transition-all"
                       />
                       <input
                         value={selectedTable || ''}
                         onChange={e => setSelectedTable(e.target.value || null)}
                         placeholder="Table #"
-                        className="w-20 themed-bg-primary border themed-border rounded-xl py-2.5 px-3 themed-text text-sm focus:outline-none focus:border-neon-green/40 transition-all text-center"
+                        className="w-20 themed-bg-primary border themed-border rounded-xl py-2.5 px-3 themed-text text-sm focus:outline-none focus:border-[#4F6EF6]/40 transition-all text-center"
                       />
                     </div>
 
                     <div className="flex items-center gap-3">
                       <div className="flex-1">
                         <p className="text-[9px] themed-text-dim uppercase font-black tracking-widest">Total</p>
-                        <p className="text-2xl font-black text-neon-green font-mono">KES {cartTotal.toLocaleString()}</p>
+                        <p className="text-2xl font-black text-[#4F6EF6] font-mono">KES {cartTotal.toLocaleString()}</p>
                       </div>
                       <div className="flex gap-2">
                         <button
                           onClick={() => initiateTabCreation(TabStatus.OPEN)}
-                          className="px-4 py-3 themed-bg-primary border themed-border rounded-xl text-xs font-black themed-text hover:border-neon-green/30 transition-all uppercase tracking-wider"
+                          className="px-4 py-3 themed-bg-primary border themed-border rounded-xl text-xs font-black themed-text hover:border-[#4F6EF6]/30 transition-all uppercase tracking-wider"
                         >
                           Open Tab
                         </button>
@@ -923,7 +971,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                         )}
                         <button
                           onClick={() => initiateTabCreation(TabStatus.PAID)}
-                          className="px-6 py-3 bg-neon-green text-black rounded-xl text-xs font-black hover:scale-105 transition-all shadow-lg shadow-neon-green/20 uppercase tracking-wider"
+                          className="px-6 py-3 bg-[#4F6EF6] text-white rounded-xl text-xs font-black hover:scale-105 transition-all shadow-lg shadow-[#4F6EF6]/20 uppercase tracking-wider"
                         >
                           Charge
                         </button>
@@ -1094,8 +1142,8 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                 className="w-full max-w-md themed-bg-secondary border themed-border rounded-[2.5rem] p-10 shadow-2xl"
               >
                 <div className="flex items-center gap-3 mb-8">
-                  <div className="w-12 h-12 bg-neon-green/10 border border-neon-green/20 rounded-2xl flex items-center justify-center">
-                    <FileText size={24} className="text-neon-green" />
+                  <div className="w-12 h-12 bg-[#4F6EF6]/10 border border-[#4F6EF6]/20 rounded-2xl flex items-center justify-center">
+                    <FileText size={24} className="text-[#4F6EF6]" />
                   </div>
                   <div>
                     <h3 className="text-xl font-black themed-text uppercase tracking-tight">Close Shift</h3>
@@ -1104,9 +1152,9 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-8">
-                  <div className="p-4 bg-neon-green/5 border border-neon-green/10 rounded-2xl">
+                  <div className="p-4 bg-[#4F6EF6]/5 border border-[#4F6EF6]/10 rounded-2xl">
                     <p className="text-[9px] themed-text-dim font-black uppercase tracking-widest mb-1">Revenue</p>
-                    <p className="text-xl font-black text-neon-green">KES {shiftRevenue.toLocaleString()}</p>
+                    <p className="text-xl font-black text-[#4F6EF6]">KES {shiftRevenue.toLocaleString()}</p>
                   </div>
                   <div className="p-4 bg-black/5 border themed-border rounded-2xl">
                     <p className="text-[9px] themed-text-dim font-black uppercase tracking-widest mb-1">Transactions</p>
@@ -1129,7 +1177,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                     onChange={(e) => setShiftNote(e.target.value)}
                     placeholder="Any issues, incidents, or handover notes..."
                     rows={3}
-                    className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-5 text-sm themed-text focus:outline-none focus:border-neon-green/40 transition-all font-medium resize-none"
+                    className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-5 text-sm themed-text focus:outline-none focus:border-[#4F6EF6]/40 transition-all font-medium resize-none"
                   />
                 </div>
 
@@ -1142,7 +1190,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
                   </button>
                   <button
                     onClick={handleCloseShift}
-                    className="py-4 bg-neon-green text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-[0_10px_20px_rgba(0,255,136,0.3)]"
+                    className="py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-[0_10px_20px_rgba(0,255,136,0.3)]"
                   >
                     Log & Close
                   </button>
@@ -1161,7 +1209,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             onClick={scrollToBottom}
-            className="fixed bottom-8 right-8 z-[100] p-4 bg-neon-green text-black rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all animate-bounce print:hidden"
+            className="fixed bottom-8 right-8 z-[100] p-4 bg-[#4F6EF6] text-white rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all animate-bounce print:hidden"
           >
             <ArrowDown size={24} />
           </motion.button>
@@ -1187,7 +1235,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
               className="w-full max-w-sm themed-bg-secondary border themed-border rounded-[2rem] p-8 shadow-2xl"
             >
               <div className="flex items-center justify-between mb-6">
-                <div className="w-12 h-12 bg-neon-green rounded-2xl flex items-center justify-center">
+                <div className="w-12 h-12 bg-[#4F6EF6] rounded-2xl flex items-center justify-center">
                   <Download size={22} className="text-black" />
                 </div>
                 <button onClick={() => setShowIOSInstall(false)} className="themed-text-dim hover:themed-text">
@@ -1198,21 +1246,21 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout }: POSApp
               <p className="themed-text-dim text-sm mb-6">Add MADIS to your home screen for a full-screen experience.</p>
               <ol className="space-y-4">
                 <li className="flex items-start gap-3">
-                  <span className="w-6 h-6 bg-neon-green/20 text-neon-green rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5">1</span>
+                  <span className="w-6 h-6 bg-[#4F6EF6]/20 text-[#4F6EF6] rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5">1</span>
                   <p className="text-sm themed-text font-medium">Tap the <Share size={14} className="inline mx-1 text-blue-400" /> <strong>Share</strong> button at the bottom of Safari</p>
                 </li>
                 <li className="flex items-start gap-3">
-                  <span className="w-6 h-6 bg-neon-green/20 text-neon-green rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5">2</span>
+                  <span className="w-6 h-6 bg-[#4F6EF6]/20 text-[#4F6EF6] rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5">2</span>
                   <p className="text-sm themed-text font-medium">Scroll down and tap <strong>"Add to Home Screen"</strong></p>
                 </li>
                 <li className="flex items-start gap-3">
-                  <span className="w-6 h-6 bg-neon-green/20 text-neon-green rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5">3</span>
+                  <span className="w-6 h-6 bg-[#4F6EF6]/20 text-[#4F6EF6] rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5">3</span>
                   <p className="text-sm themed-text font-medium">Tap <strong>"Add"</strong> in the top right corner</p>
                 </li>
               </ol>
               <button
                 onClick={() => setShowIOSInstall(false)}
-                className="mt-8 w-full py-4 bg-neon-green text-black rounded-2xl font-black text-xs uppercase tracking-widest"
+                className="mt-8 w-full py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest"
               >
                 Got it
               </button>
@@ -1233,11 +1281,11 @@ function NavItem({ active, icon: Icon, label, onClick }: { active: boolean; icon
       onClick={onClick}
       className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all group relative border ${
         active
-          ? 'bg-neon-green/10 themed-text border-neon-green/20 shadow-sm'
+          ? 'bg-[#4F6EF6]/10 themed-text border-[#4F6EF6]/20 shadow-sm'
           : 'themed-text-dim border-transparent hover:themed-bg-secondary hover:themed-text'
       }`}
     >
-      <Icon size={18} className={active ? 'text-neon-green drop-shadow-[0_0_8px_rgba(0,255,136,0.5)]' : 'group-hover:text-neon-green/60'} />
+      <Icon size={18} className={active ? 'text-[#4F6EF6] drop-shadow-[0_0_8px_rgba(0,255,136,0.5)]' : 'group-hover:text-[#4F6EF6]/60'} />
       <span className="font-black text-[11px] uppercase tracking-widest">{label}</span>
     </button>
   );
@@ -1266,7 +1314,7 @@ function TabCard({ tab, onStatusChange, onPrint, onDelete, isDebt = false, staff
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onPrint(); }}
-            className="p-2 bg-black/5 hover:bg-neon-green/20 hover:text-neon-green themed-text-dim rounded-xl transition-all border themed-border print:hidden"
+            className="p-2 bg-black/5 hover:bg-[#4F6EF6]/20 hover:text-[#4F6EF6] themed-text-dim rounded-xl transition-all border themed-border print:hidden"
             title="Print Receipt"
           >
             <Printer size={16} />
@@ -1281,7 +1329,7 @@ function TabCard({ tab, onStatusChange, onPrint, onDelete, isDebt = false, staff
             <h4 className="text-xl font-black themed-text truncate leading-tight">{tab.customerName}</h4>
             <p className="text-[10px] themed-text-dim font-bold mt-1">Served by: <span className="themed-text">{staffName}</span></p>
           </div>
-          <div className={`px-3 py-1 rounded-lg text-[10px] font-black shadow-sm ${isDebt ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-neon-green/10 text-neon-green border border-neon-green/20'} uppercase tracking-widest`}>
+          <div className={`px-3 py-1 rounded-lg text-[10px] font-black shadow-sm ${isDebt ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-[#4F6EF6]/10 text-[#4F6EF6] border border-[#4F6EF6]/20'} uppercase tracking-widest`}>
             {tab.status}
           </div>
         </div>
@@ -1331,13 +1379,13 @@ function PriceOverrideModal({ item, onConfirm, onCancel }: { item: TabItem; onCo
             autoFocus
             value={newPrice}
             onChange={(e) => setNewPrice(e.target.value)}
-            className="w-full themed-bg-primary border themed-border rounded-2xl py-5 px-6 text-2xl text-neon-green focus:outline-none focus:border-neon-green transition-all font-mono font-black"
+            className="w-full themed-bg-primary border themed-border rounded-2xl py-5 px-6 text-2xl text-[#4F6EF6] focus:outline-none focus:border-[#4F6EF6] transition-all font-mono font-black"
           />
         </div>
 
         <div className="flex gap-4">
           <button onClick={onCancel} className="flex-1 py-4 bg-black/5 themed-text-dim border themed-border rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black/10 transition-all">ABORT</button>
-          <button onClick={() => onConfirm(Math.round(Number(newPrice)))} className="flex-1 py-4 bg-neon-green text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-all shadow-[0_10px_20px_rgba(0,255,136,0.3)]">AUTHORIZE</button>
+          <button onClick={() => onConfirm(Math.round(Number(newPrice)))} className="flex-1 py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] transition-all shadow-[0_10px_20px_rgba(0,255,136,0.3)]">AUTHORIZE</button>
         </div>
       </div>
     </div>
@@ -1399,7 +1447,7 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
           )}
           <button
             onClick={() => setEditingItem({ id: 'NEW', name: '', category: '', price: 0, stock: 0, isQuickSell: false, type: 'DRINK' })}
-            className="bg-neon-green text-black px-8 py-4 rounded-[2rem] font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all shadow-[0_10px_20px_rgba(0,255,136,0.3)]"
+            className="bg-[#4F6EF6] text-white px-8 py-4 rounded-[2rem] font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all shadow-[0_10px_20px_rgba(0,255,136,0.3)]"
           >
             <Plus size={18} /> Add New Product
           </button>
@@ -1424,7 +1472,7 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
                 <tr key={item.id} className={`hover:bg-black/5 transition-colors group ${item.stock < 10 && item.type !== ProductType.SERVICE ? 'bg-red-500/[0.02]' : ''}`}>
                   <td className="py-6 px-8">
                     <div className="flex items-center gap-4">
-                      <div className={`w-2 h-2 rounded-full ${item.stock < 10 && item.type !== ProductType.SERVICE ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-neon-green'}`} />
+                      <div className={`w-2 h-2 rounded-full ${item.stock < 10 && item.type !== ProductType.SERVICE ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-[#4F6EF6]'}`} />
                       <div>
                         <p className="font-black themed-text text-lg leading-tight">{item.name}</p>
                         <p className="text-[9px] themed-text-dim uppercase font-black tracking-widest mt-1 opacity-50">SKU: {item.id.slice(0, 8)}</p>
@@ -1434,8 +1482,8 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
                   <td className="py-6">
                     <span className="px-3 py-1 bg-black/5 border themed-border rounded-lg text-[9px] font-black themed-text-dim uppercase tracking-widest">{item.category}</span>
                   </td>
-                  <td className="py-6 font-mono font-black text-neon-green">
-                    <button onClick={() => setEditingItem(item)} className="hover:bg-neon-green/10 px-3 py-1 rounded-lg transition-all" title="Click to edit price">
+                  <td className="py-6 font-mono font-black text-[#4F6EF6]">
+                    <button onClick={() => setEditingItem(item)} className="hover:bg-[#4F6EF6]/10 px-3 py-1 rounded-lg transition-all" title="Click to edit price">
                       KES {item.price.toLocaleString()}
                     </button>
                   </td>
@@ -1446,7 +1494,7 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
                           <X size={14} className="rotate-45" />
                         </button>
                         <span className={`px-4 font-mono font-black text-sm ${item.stock < 10 && item.type !== ProductType.SERVICE ? 'text-red-500' : 'themed-text'}`}>{item.stock}</span>
-                        <button onClick={() => adjustStock(item.id, 1)} className="p-2 hover:bg-neon-green/20 hover:text-neon-green themed-text-dim transition-colors">
+                        <button onClick={() => adjustStock(item.id, 1)} className="p-2 hover:bg-[#4F6EF6]/20 hover:text-[#4F6EF6] themed-text-dim transition-colors">
                           <Plus size={14} />
                         </button>
                       </div>
@@ -1459,7 +1507,7 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
                     <div className="flex justify-center">
                       <button
                         onClick={() => toggleQuickSell(item.id)}
-                        className={`w-10 h-6 rounded-full flex items-center p-1 transition-all border ${item.isQuickSell ? 'bg-neon-green border-neon-green' : 'bg-black/10 border-white/5'}`}
+                        className={`w-10 h-6 rounded-full flex items-center p-1 transition-all border ${item.isQuickSell ? 'bg-[#4F6EF6] border-[#4F6EF6]' : 'bg-black/10 border-white/5'}`}
                       >
                         <motion.div animate={{ x: item.isQuickSell ? 16 : 0 }} className={`w-4 h-4 rounded-full shadow-lg ${item.isQuickSell ? 'bg-black' : 'bg-white/40'}`} />
                       </button>
@@ -1467,7 +1515,7 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
                   </td>
                   <td className="py-6 px-8 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      <button onClick={() => setEditingItem(item)} className="p-3 bg-black/5 border themed-border rounded-2xl themed-text-dim hover:text-neon-green hover:border-neon-green/20 transition-all" title="Edit Item">
+                      <button onClick={() => setEditingItem(item)} className="p-3 bg-black/5 border themed-border rounded-2xl themed-text-dim hover:text-[#4F6EF6] hover:border-[#4F6EF6]/20 transition-all" title="Edit Item">
                         <Settings size={18} />
                       </button>
                       <button onClick={() => deleteItem(item.id)} className="p-3 bg-red-500/5 border border-transparent hover:border-red-500/20 rounded-2xl text-red-500/50 hover:text-red-500 transition-all" title="Delete Item">
@@ -1520,7 +1568,7 @@ function InventoryEditModal({ item, onConfirm, onCancel, categories = [] }: { it
         <div className="space-y-6">
           <div className="space-y-2">
             <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Item Name</label>
-            <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-neon-green transition-all font-bold" placeholder="e.g. Tusker Cider" />
+            <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold" placeholder="e.g. Tusker Cider" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -1537,7 +1585,7 @@ function InventoryEditModal({ item, onConfirm, onCancel, categories = [] }: { it
                     setFormData({ ...formData, category: e.target.value });
                   }
                 }}
-                className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-neon-green transition-all font-bold appearance-none"
+                className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none"
               >
                 <option value="" disabled>Select category…</option>
                 {allCategories.map(cat => (
@@ -1554,14 +1602,14 @@ function InventoryEditModal({ item, onConfirm, onCancel, categories = [] }: { it
                     setCustomCategory(e.target.value);
                     setFormData({ ...formData, category: e.target.value });
                   }}
-                  className="w-full themed-bg-primary border border-neon-green/40 rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-neon-green transition-all font-bold mt-2"
+                  className="w-full themed-bg-primary border border-[#4F6EF6]/40 rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold mt-2"
                   placeholder="Type custom category…"
                 />
               )}
             </div>
             <div className="space-y-2">
               <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Type</label>
-              <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-neon-green transition-all font-bold appearance-none">
+              <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none">
                 <option value="DRINK">Drink</option>
                 <option value="FOOD">Food</option>
                 <option value="ROOM">Room / Unit</option>
@@ -1573,18 +1621,18 @@ function InventoryEditModal({ item, onConfirm, onCancel, categories = [] }: { it
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Price (KES)</label>
-              <input type="number" required value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-neon-green transition-all font-bold" placeholder="0" />
+              <input type="number" required value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold" placeholder="0" />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Stock Level</label>
-              <input type="number" required value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-neon-green transition-all font-bold" placeholder="0" />
+              <input type="number" required value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold" placeholder="0" />
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mt-10">
           <button onClick={onCancel} className="py-4 bg-black/5 themed-text-dim border themed-border rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black/10 transition-all font-mono">DISCARD</button>
-          <button onClick={handleConfirm} disabled={!formData.name || !formData.category} className="py-4 bg-neon-green text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 shadow-[0_10px_20px_rgba(0,255,136,0.3)]">CONFIRM</button>
+          <button onClick={handleConfirm} disabled={!formData.name || !formData.category} className="py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 shadow-[0_10px_20px_rgba(0,255,136,0.3)]">CONFIRM</button>
         </div>
       </div>
     </div>
@@ -1610,7 +1658,7 @@ function RoomManager({ rooms, setRooms, tabs, onBillToRoom }: any) {
         </div>
         <button
           onClick={() => setEditingRoom({ id: 'NEW', number: '', type: 'Standard', price: 3500, status: 'AVAILABLE' })}
-          className="bg-neon-green text-black px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all shadow-lg"
+          className="bg-[#4F6EF6] text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all shadow-lg"
         >
           <Plus size={18} /> Add Room
         </button>
@@ -1626,7 +1674,7 @@ function RoomManager({ rooms, setRooms, tabs, onBillToRoom }: any) {
                   <p className="text-[10px] themed-text-dim uppercase font-black tracking-widest mb-1">Room {room.type}</p>
                   <h4 className="text-4xl font-black themed-text tracking-tighter">{room.number}</h4>
                 </div>
-                <div className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${room.status === 'AVAILABLE' ? 'bg-neon-green/10 text-neon-green border-neon-green/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                <div className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${room.status === 'AVAILABLE' ? 'bg-[#4F6EF6]/10 text-[#4F6EF6] border-[#4F6EF6]/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
                   {room.status}
                 </div>
               </div>
@@ -1646,7 +1694,7 @@ function RoomManager({ rooms, setRooms, tabs, onBillToRoom }: any) {
               </div>
 
               <div className="flex gap-3">
-                <button onClick={() => onBillToRoom(room)} className="flex-1 py-4 bg-neon-green text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-md">
+                <button onClick={() => onBillToRoom(room)} className="flex-1 py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-md">
                   Bill Room
                 </button>
                 <button onClick={() => setEditingRoom(room)} className="p-4 bg-black/5 themed-text-dim border themed-border rounded-2xl hover:bg-black/10 transition-all">
@@ -1681,7 +1729,7 @@ function RoomManager({ rooms, setRooms, tabs, onBillToRoom }: any) {
                   else setRooms(rooms.map((r: any) => r.id === editingRoom.id ? finalRoom : r));
                   setEditingRoom(null);
                 }}
-                className="py-4 bg-neon-green text-black rounded-2xl font-black text-xs uppercase shadow-lg"
+                className="py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase shadow-lg"
               >
                 Confirm
               </button>
@@ -1717,7 +1765,7 @@ function StaffManager({ staff, setStaff, addAuditLog, currentUser, setEditingSta
         </div>
         <button
           onClick={() => setEditingStaff({ id: 'NEW', name: '', pin: '', role: UserRole.STAFF })}
-          className="bg-neon-green text-black px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all"
+          className="bg-[#4F6EF6] text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all"
         >
           <Plus size={20} /> ADD NEW
         </button>
@@ -1726,7 +1774,7 @@ function StaffManager({ staff, setStaff, addAuditLog, currentUser, setEditingSta
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {staff.map((u: User) => (
           <div key={u.id} className="p-6 themed-bg-secondary border themed-border rounded-3xl group relative overflow-hidden transition-all hover:border-black/10 shadow-lg">
-            <div className={`absolute top-0 right-0 p-3 text-[10px] font-black uppercase tracking-widest ${String(u.role).toUpperCase() === UserRole.OWNER ? 'bg-neon-green text-black' : 'bg-black/5 themed-text-dim'}`}>
+            <div className={`absolute top-0 right-0 p-3 text-[10px] font-black uppercase tracking-widest ${String(u.role).toUpperCase() === UserRole.OWNER ? 'bg-[#4F6EF6] text-white' : 'bg-black/5 themed-text-dim'}`}>
               {u.role}
             </div>
             <div className="flex items-center gap-4 mb-6">
@@ -1742,9 +1790,9 @@ function StaffManager({ staff, setStaff, addAuditLog, currentUser, setEditingSta
             <div className="bg-black/5 rounded-xl p-4 flex items-center justify-between border themed-border">
               <div>
                 <p className="text-[10px] themed-text-dim uppercase font-black">Assigned PIN</p>
-                <p className="text-lg font-mono font-black tracking-widest text-neon-green">****</p>
+                <p className="text-lg font-mono font-black tracking-widest text-[#4F6EF6]">****</p>
               </div>
-              <button onClick={() => setEditingStaff(u)} className="text-xs font-black themed-text-dim hover:text-neon-green transition-colors flex items-center gap-2">
+              <button onClick={() => setEditingStaff(u)} className="text-xs font-black themed-text-dim hover:text-[#4F6EF6] transition-colors flex items-center gap-2">
                 <Settings size={14} /> EDIT
               </button>
             </div>
@@ -1782,7 +1830,7 @@ function StaffEditModal({ staff, onConfirm, onCancel, currentUser }: { staff: an
               required
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-neon-green transition-all font-bold"
+              className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold"
               placeholder="e.g. John Smith"
             />
           </div>
@@ -1792,7 +1840,7 @@ function StaffEditModal({ staff, onConfirm, onCancel, currentUser }: { staff: an
             <select
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-neon-green transition-all font-bold appearance-none"
+              className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none"
             >
               <option value={UserRole.STAFF}>Service Staff</option>
               <option value={UserRole.SUPERVISOR}>Supervisor</option>
@@ -1805,7 +1853,7 @@ function StaffEditModal({ staff, onConfirm, onCancel, currentUser }: { staff: an
 
           <div className="space-y-2">
             <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">
-              Security PIN (4 Digits){staff.id !== 'NEW' && <span className="text-neon-green/50 ml-2">— leave blank to keep current</span>}
+              Security PIN (4 Digits){staff.id !== 'NEW' && <span className="text-[#4F6EF6]/50 ml-2">— leave blank to keep current</span>}
             </label>
             <div className="relative">
               <input
@@ -1813,7 +1861,7 @@ function StaffEditModal({ staff, onConfirm, onCancel, currentUser }: { staff: an
                 maxLength={4}
                 value={formData.pin}
                 onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '') })}
-                className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 text-2xl text-neon-green focus:outline-none focus:border-neon-green transition-all font-mono font-black tracking-[1em]"
+                className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 text-2xl text-[#4F6EF6] focus:outline-none focus:border-[#4F6EF6] transition-all font-mono font-black tracking-[1em]"
                 placeholder={staff.id === 'NEW' ? '0000' : '••••'}
               />
               <button onClick={() => setShowPin(!showPin)} className="absolute right-4 top-1/2 -translate-y-1/2 themed-text-dim hover:themed-text transition-all">
@@ -1828,7 +1876,7 @@ function StaffEditModal({ staff, onConfirm, onCancel, currentUser }: { staff: an
           <button
             onClick={() => onConfirm(formData)}
             disabled={!formData.name || (staff.id === 'NEW' && formData.pin.length !== 4)}
-            className="py-4 bg-neon-green text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100 shadow-[0_10px_20px_rgba(0,255,136,0.3)]"
+            className="py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100 shadow-[0_10px_20px_rgba(0,255,136,0.3)]"
           >
             AUTHORIZE
           </button>
@@ -1842,8 +1890,8 @@ function AuditViewer({ logs }: { logs: any[] }) {
   const actionColor = (action: string) => {
     if (action.includes('Login') || action.includes('Logout')) return 'bg-blue-400';
     if (action.includes('Delete') || action.includes('Revoke') || action.includes('Cancel')) return 'bg-red-500';
-    if (action.includes('Settled') || action.includes('Paid') || action.includes('Closed')) return 'bg-neon-green';
-    return 'bg-neon-green/50';
+    if (action.includes('Settled') || action.includes('Paid') || action.includes('Closed')) return 'bg-[#4F6EF6]';
+    return 'bg-[#4F6EF6]/50';
   };
 
   return (
@@ -1855,7 +1903,7 @@ function AuditViewer({ logs }: { logs: any[] }) {
 
       <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
         {logs.map(log => (
-          <div key={log.id} className="p-4 themed-bg-secondary border themed-border rounded-2xl flex items-center justify-between gap-6 hover:border-neon-green/20 transition-all shadow-sm">
+          <div key={log.id} className="p-4 themed-bg-secondary border themed-border rounded-2xl flex items-center justify-between gap-6 hover:border-[#4F6EF6]/20 transition-all shadow-sm">
             <div className="flex items-center gap-4">
               <div className={`w-2 h-2 rounded-full shrink-0 ${actionColor(log.action)}`} />
               <div>
