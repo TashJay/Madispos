@@ -6,7 +6,7 @@ import {
   History, Wifi, WifiOff, X, Check, Save, RotateCcw,
   Sun, Moon, Zap, Crown, Eye, EyeOff, ArrowDown, Printer,
   TrendingUp, Trash2, FileText, Download, Share, BarChart2, Play,
-  Sparkles, SlidersHorizontal
+  Sparkles, SlidersHorizontal, Upload, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 import { PinPad } from './components/PinPad';
 import { TransactionModal } from './components/TransactionModal';
@@ -253,6 +253,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
   const [printingTab, setPrintingTab] = useState<Tab | null>(null);
   const [showShiftSummary, setShowShiftSummary] = useState(false);
   const [shiftNote, setShiftNote] = useState('');
+  const [showCSVImport, setShowCSVImport] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
@@ -1152,6 +1153,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
                   setEditingItem={setEditingItem}
                   onConfirmDialog={showConfirm}
                   businessType={businessType}
+                  onImportCSV={() => setShowCSVImport(true)}
                 />
               </motion.div>
             )}
@@ -1245,6 +1247,20 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, isDemo =
               currentUser={currentUser}
               onConfirm={handleStaffSave}
               onCancel={() => setEditingStaff(null)}
+            />
+          )}
+
+          {showCSVImport && (
+            <CSVImportModal
+              businessType={businessType}
+              existingCategories={categories}
+              onImport={(items) => {
+                const newItems = items.map(item => ({ ...item, id: crypto.randomUUID() }));
+                setInventory([...inventory, ...newItems]);
+                addAuditLog(currentUser, 'CSV Import', `Imported ${newItems.length} items from CSV`);
+                setShowCSVImport(false);
+              }}
+              onCancel={() => setShowCSVImport(false)}
             />
           )}
 
@@ -1527,7 +1543,7 @@ function PriceOverrideModal({ item, onConfirm, onCancel }: { item: TabItem; onCo
   );
 }
 
-function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, setEditingItem, onConfirmDialog }: any) {
+function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, setEditingItem, onConfirmDialog, businessType, onImportCSV }: any) {
   const deleteItem = (id: string) => {
     const item = inventory.find((i: Product) => i.id === id);
     onConfirmDialog(
@@ -1580,6 +1596,12 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
               <span className="text-[10px] text-red-500 font-black uppercase tracking-widest">{lowStockCount} Items Low Stock</span>
             </div>
           )}
+          <button
+            onClick={onImportCSV}
+            className="border themed-border themed-text-dim px-6 py-4 rounded-[2rem] font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 hover:border-[#4F6EF6]/40 hover:text-[#4F6EF6] transition-all"
+          >
+            <Upload size={16} /> Import CSV
+          </button>
           <button
             onClick={() => setEditingItem({ id: 'NEW', name: '', category: '', price: 0, stock: 0, isQuickSell: false, type: 'DRINK' })}
             className="bg-[#4F6EF6] text-white px-8 py-4 rounded-[2rem] font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all shadow-[0_10px_20px_rgba(0,255,136,0.3)]"
@@ -1681,6 +1703,305 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
           {lowStockCount > 0 && <span className="text-[9px] text-red-500 font-black uppercase tracking-[0.2em]">{lowStockCount} Warnings active</span>}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── CSV Import Modal ──────────────────────────────────────────────────────────
+
+interface CSVRow {
+  name: string;
+  category: string;
+  price: number;
+  stock: number;
+  type: string;
+  isQuickSell: boolean;
+  errors: string[];
+  valid: boolean;
+}
+
+function parseCSVText(text: string, validCategories: string[]): CSVRow[] {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+
+  const header = lines[0].split(/[,;\t]/).map(h => h.trim().toLowerCase().replace(/[^a-z]/g, ''));
+  const nameIdx      = header.findIndex(h => h === 'name' || h === 'itemname' || h === 'product');
+  const catIdx       = header.findIndex(h => h === 'category' || h === 'cat');
+  const priceIdx     = header.findIndex(h => h === 'price' || h === 'cost' || h === 'amount');
+  const stockIdx     = header.findIndex(h => h === 'stock' || h === 'qty' || h === 'quantity');
+  const typeIdx      = header.findIndex(h => h === 'type' || h === 'producttype');
+  const qsIdx        = header.findIndex(h => h === 'quicksell' || h === 'quick' || h === 'featured');
+
+  const results: CSVRow[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(/[,;\t]/).map(c => c.trim().replace(/^["']|["']$/g, ''));
+    const errors: string[] = [];
+
+    const name     = nameIdx >= 0 ? cols[nameIdx] || '' : '';
+    const category = catIdx  >= 0 ? cols[catIdx]  || '' : '';
+    const rawPrice = priceIdx >= 0 ? cols[priceIdx] : '';
+    const rawStock = stockIdx >= 0 ? cols[stockIdx] : '';
+    const rawType  = typeIdx  >= 0 ? (cols[typeIdx] || '').toUpperCase() : 'SERVICE';
+    const rawQS    = qsIdx    >= 0 ? cols[qsIdx]    : '';
+
+    if (!name)             errors.push('Name is required');
+    if (!category)         errors.push('Category is required');
+
+    const price = parseFloat(rawPrice.replace(/[^0-9.]/g, ''));
+    const stock = parseInt(rawStock.replace(/[^0-9]/g, ''), 10);
+
+    if (isNaN(price) || price < 0) errors.push('Invalid price');
+    if (isNaN(stock) || stock < 0) errors.push('Invalid stock');
+
+    const validTypes = ['DRINK', 'FOOD', 'ROOM', 'SERVICE'];
+    const type = validTypes.includes(rawType) ? rawType : 'SERVICE';
+
+    const isQuickSell = rawQS.toLowerCase() === 'true' || rawQS === '1' || rawQS.toLowerCase() === 'yes';
+
+    results.push({
+      name,
+      category: category || 'General',
+      price: isNaN(price) ? 0 : Math.round(price),
+      stock: isNaN(stock) ? 0 : stock,
+      type,
+      isQuickSell,
+      errors,
+      valid: errors.length === 0,
+    });
+  }
+  return results;
+}
+
+function CSVImportModal({ businessType, existingCategories = [], onImport, onCancel }: {
+  businessType: string;
+  existingCategories?: string[];
+  onImport: (items: Omit<CSVRow, 'errors' | 'valid'>[]) => void;
+  onCancel: () => void;
+}) {
+  const [stage, setStage] = useState<'upload' | 'preview'>('upload');
+  const [rows, setRows] = useState<CSVRow[]>([]);
+  const [fileName, setFileName] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const suggestedCategories = getBusinessCategories(businessType, existingCategories);
+  const validRows  = rows.filter(r => r.valid);
+  const invalidRows = rows.filter(r => !r.valid);
+
+  const handleFile = (file: File) => {
+    if (!file.name.endsWith('.csv')) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const parsed = parseCSVText(text, suggestedCategories);
+      setRows(parsed);
+      setStage('preview');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  const downloadTemplate = () => {
+    const cats = suggestedCategories.slice(0, 3).join(' / ');
+    const csv = [
+      'name,category,price,stock,type,quickSell',
+      `Example Item,${suggestedCategories[0] || 'General'},500,100,SERVICE,true`,
+      `Another Item,${suggestedCategories[1] || 'General'},1200,50,DRINK,false`,
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'madis_inventory_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        className="w-full max-w-2xl themed-bg-secondary border themed-border rounded-[2.5rem] p-8 shadow-2xl flex flex-col max-h-[90vh]"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-6 shrink-0">
+          <div>
+            <h3 className="text-2xl font-black themed-text tracking-tighter flex items-center gap-3">
+              <div className="w-10 h-10 bg-[#4F6EF6]/10 border border-[#4F6EF6]/20 rounded-2xl flex items-center justify-center">
+                <Upload size={18} className="text-[#4F6EF6]" />
+              </div>
+              Bulk Import CSV
+            </h3>
+            <p className="themed-text-dim text-sm mt-1 ml-[3.25rem]">
+              {stage === 'upload' ? 'Upload a spreadsheet to add many items at once' : `${rows.length} rows parsed from "${fileName}"`}
+            </p>
+          </div>
+          <button onClick={onCancel} className="p-2 themed-text-dim hover:themed-text transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <AnimatePresence mode="wait">
+
+          {/* ── Upload stage ── */}
+          {stage === 'upload' && (
+            <motion.div key="upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col gap-5">
+
+              {/* Drop zone */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => fileRef.current?.click()}
+                className={`border-2 border-dashed rounded-3xl p-12 flex flex-col items-center gap-4 cursor-pointer transition-all ${
+                  isDragging
+                    ? 'border-[#4F6EF6] bg-[#4F6EF6]/5 scale-[1.01]'
+                    : 'border-white/10 hover:border-[#4F6EF6]/40 hover:bg-[#4F6EF6]/3'
+                }`}
+              >
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${isDragging ? 'bg-[#4F6EF6]/20' : 'bg-white/5'}`}>
+                  <Upload size={28} className={isDragging ? 'text-[#4F6EF6]' : 'themed-text-dim'} />
+                </div>
+                <div className="text-center">
+                  <p className="themed-text font-black text-sm">
+                    {isDragging ? 'Drop your CSV here' : 'Drag & drop your CSV file'}
+                  </p>
+                  <p className="themed-text-dim text-xs mt-1">or click to browse · .csv files only</p>
+                </div>
+              </div>
+              <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+
+              {/* Format info */}
+              <div className="bg-[#4F6EF6]/5 border border-[#4F6EF6]/15 rounded-2xl p-5 space-y-3">
+                <p className="text-xs font-black themed-text uppercase tracking-widest flex items-center gap-2">
+                  <FileText size={13} className="text-[#4F6EF6]" /> Required CSV columns
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {[
+                    { col: 'name', desc: 'Product name', req: true },
+                    { col: 'category', desc: 'e.g. Beers, Hair', req: true },
+                    { col: 'price', desc: 'Amount in KES', req: true },
+                    { col: 'stock', desc: 'Starting quantity', req: true },
+                    { col: 'type', desc: 'DRINK/FOOD/ROOM/SERVICE', req: false },
+                    { col: 'quickSell', desc: 'true or false', req: false },
+                  ].map(({ col, desc, req }) => (
+                    <div key={col} className="bg-black/10 rounded-xl px-3 py-2">
+                      <span className="font-mono text-[#4F6EF6] text-xs font-black">{col}</span>
+                      {req && <span className="text-red-400 text-[10px] ml-1">*</span>}
+                      <p className="themed-text-dim text-[10px] mt-0.5">{desc}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="themed-text-dim text-[10px]">* Required &nbsp;·&nbsp; Supports comma, semicolon, and tab-separated files</p>
+              </div>
+
+              {/* Template download */}
+              <button
+                onClick={(e) => { e.stopPropagation(); downloadTemplate(); }}
+                className="flex items-center justify-center gap-2 w-full py-3 border themed-border themed-text-dim rounded-2xl hover:border-[#4F6EF6]/30 hover:text-[#4F6EF6] transition-all text-xs font-black uppercase tracking-widest"
+              >
+                <Download size={14} /> Download template for {businessType || 'your business'}
+              </button>
+            </motion.div>
+          )}
+
+          {/* ── Preview stage ── */}
+          {stage === 'preview' && (
+            <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col gap-4 min-h-0">
+
+              {/* Summary bar */}
+              <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                <div className="flex items-center gap-2 px-4 py-2 bg-[#4F6EF6]/8 border border-[#4F6EF6]/20 rounded-xl">
+                  <CheckCircle2 size={14} className="text-[#4F6EF6]" />
+                  <span className="text-xs font-black text-[#4F6EF6]">{validRows.length} ready to import</span>
+                </div>
+                {invalidRows.length > 0 && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-red-500/8 border border-red-500/20 rounded-xl">
+                    <AlertTriangle size={14} className="text-red-400" />
+                    <span className="text-xs font-black text-red-400">{invalidRows.length} rows with errors (will be skipped)</span>
+                  </div>
+                )}
+                <button onClick={() => { setStage('upload'); setRows([]); setFileName(''); }} className="ml-auto text-[10px] themed-text-dim hover:themed-text underline transition-colors">
+                  Upload different file
+                </button>
+              </div>
+
+              {/* Preview table */}
+              <div className="overflow-auto rounded-2xl border themed-border flex-1 min-h-0 max-h-[40vh]">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 bg-black/20 backdrop-blur-sm">
+                    <tr className="border-b themed-border">
+                      <th className="py-3 px-4 themed-text-dim font-black uppercase tracking-widest">Status</th>
+                      <th className="py-3 px-4 themed-text-dim font-black uppercase tracking-widest">Name</th>
+                      <th className="py-3 px-4 themed-text-dim font-black uppercase tracking-widest">Category</th>
+                      <th className="py-3 px-4 themed-text-dim font-black uppercase tracking-widest">Price</th>
+                      <th className="py-3 px-4 themed-text-dim font-black uppercase tracking-widest">Stock</th>
+                      <th className="py-3 px-4 themed-text-dim font-black uppercase tracking-widest">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y themed-border">
+                    {rows.map((row, i) => (
+                      <tr key={i} className={`${row.valid ? 'opacity-100' : 'opacity-50 bg-red-500/3'}`}>
+                        <td className="py-2.5 px-4">
+                          {row.valid
+                            ? <Check size={14} className="text-[#4F6EF6]" />
+                            : <div title={row.errors.join(', ')}><AlertTriangle size={14} className="text-red-400 cursor-help" /></div>
+                          }
+                        </td>
+                        <td className="py-2.5 px-4 themed-text font-bold max-w-[140px] truncate">{row.name || <span className="text-red-400 italic">missing</span>}</td>
+                        <td className="py-2.5 px-4 themed-text-dim">{row.category}</td>
+                        <td className="py-2.5 px-4 font-mono text-[#4F6EF6]">KES {row.price.toLocaleString()}</td>
+                        <td className="py-2.5 px-4 themed-text">{row.stock}</td>
+                        <td className="py-2.5 px-4 themed-text-dim capitalize">{row.type.toLowerCase()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Error details (if any) */}
+              {invalidRows.length > 0 && (
+                <div className="bg-red-500/5 border border-red-500/15 rounded-xl px-4 py-3 shrink-0">
+                  <p className="text-xs font-black text-red-400 uppercase tracking-widest mb-1.5">Rows with errors</p>
+                  <ul className="space-y-0.5">
+                    {invalidRows.slice(0, 5).map((r, i) => (
+                      <li key={i} className="text-[11px] text-red-400/80">
+                        <span className="font-bold">{r.name || `Row ${i + 1}`}:</span> {r.errors.join(', ')}
+                      </li>
+                    ))}
+                    {invalidRows.length > 5 && <li className="text-[11px] text-red-400/60">…and {invalidRows.length - 5} more</li>}
+                  </ul>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 shrink-0">
+                <button onClick={onCancel} className="flex-1 py-4 bg-black/5 themed-text-dim border themed-border rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black/10 transition-all">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => onImport(validRows.map(({ errors, valid, ...rest }) => rest))}
+                  disabled={validRows.length === 0}
+                  className="flex-1 py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 shadow-[0_10px_20px_rgba(79,110,246,0.3)] flex items-center justify-center gap-2"
+                >
+                  <Upload size={14} /> Import {validRows.length} Item{validRows.length !== 1 ? 's' : ''}
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+      </motion.div>
     </div>
   );
 }
