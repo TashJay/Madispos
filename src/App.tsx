@@ -7,7 +7,7 @@ import {
   Sun, Moon, Zap, Crown, Eye, EyeOff, ArrowDown, Printer,
   TrendingUp, Trash2, FileText, Download, Share, BarChart2, Play,
   Sparkles, SlidersHorizontal, Upload, AlertTriangle, CheckCircle2,
-  Maximize2, Minimize2
+  Maximize2, Minimize2, Calendar, Phone, Clock
 } from 'lucide-react';
 import { PinPad } from './components/PinPad';
 import { TransactionModal } from './components/TransactionModal';
@@ -28,7 +28,7 @@ import { usePOSData } from './hooks/usePOSData';
 import { useAuth } from './hooks/useAuth';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
 import { hashPin } from './lib/crypto';
-import { User, UserRole, TabStatus, Product, TabItem, Tab, ProductType, Room, Invoice, InvoiceStatus } from './types';
+import { User, UserRole, TabStatus, Product, TabItem, Tab, ProductType, Room, Invoice, InvoiceStatus, Appointment } from './types';
 import {
   demoStaff, demoInventory, demoTabs, demoAuditLogs, demoRooms,
   DEMO_BUSINESS_NAME, DEMO_BUSINESS_TYPE, DEMO_UID
@@ -228,8 +228,10 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
   const [lockoutUntil, setLockoutUntil] = useState(0);
   const [lockoutSecondsLeft, setLockoutSecondsLeft] = useState(0);
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'sales' | 'tabs' | 'inventory' | 'invoices' | 'staff' | 'audit' | 'debts' | 'rooms' | 'reports' | 'settings' | 'ai'
+    'dashboard' | 'sales' | 'tabs' | 'inventory' | 'invoices' | 'staff' | 'audit' | 'debts' | 'rooms' | 'reports' | 'settings' | 'ai' | 'appointments'
   >('dashboard');
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const SETTINGS_KEY = `madis_settings_${uid}`;
@@ -378,6 +380,11 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
   const categories = useMemo(() => {
     return Array.from(new Set(inventory.map(item => item.category)));
   }, [inventory]);
+
+  const isAppointmentBusiness = useMemo(() => {
+    const apptTypes = ['gym', 'pharmacy', 'spa', 'salon', 'clinic', 'hospital'];
+    return apptTypes.includes(String(businessType).toLowerCase());
+  }, [businessType]);
 
   const filteredInventory = useMemo(() => {
     return inventory.filter(item => {
@@ -630,25 +637,11 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
   const settleTab = (tabId: string) => {
     const tab = tabs.find(t => t.id === tabId);
     if (!tab) return;
-
-    const updatedTabs = tabs.map(t =>
-      t.id === tabId
-        ? { ...t, status: TabStatus.PAID, isDebt: false, updatedAt: Date.now() }
-        : t
-    );
-    setTabs(updatedTabs);
-    deductStock(tab.items);
-
-    tab.items.forEach(item => {
-      const invItem = inventory.find(i => i.id === item.productId);
-      if (invItem?.category === 'Rooms') {
-        const roomNum = item.name.replace('Room ', '');
-        updateRoomStatus(roomNum, 'AVAILABLE');
-      }
-    });
-
-    handlePrint(tab);
-    addAuditLog(currentUser!, 'Debt Settled', `Marked tab #${tabId.slice(0, 8)} as Paid`);
+    setCart(tab.items);
+    setCustomerName(tab.customerName);
+    setActiveTabId(tab.id);
+    setActiveTab('sales');
+    addAuditLog(currentUser!, 'Debt Settle Initiated', `Loading debt tab for ${tab.customerName} to process payment`);
   };
 
   const handleDeleteTab = (tabId: string, tabName: string) => {
@@ -951,6 +944,9 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
               {rooms.length > 0 && (
                 <NavItem active={activeTab === 'rooms'} icon={Package} label="Rooms" onClick={() => { setActiveTab('rooms'); setIsMobileMenuOpen(false); }} />
               )}
+              {isAppointmentBusiness && (
+                <NavItem active={activeTab === 'appointments'} icon={Calendar} label="Appointments" onClick={() => { setActiveTab('appointments'); setIsMobileMenuOpen(false); }} />
+              )}
             </>
           )}
 
@@ -1151,25 +1147,33 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
                   </div>
                 </div>
 
-                {/* Product Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 flex-1">
-                  {filteredInventory.map(item => (
-                    <button
-                      key={item.id}
-                      onClick={() => addToCart(item)}
-                      disabled={item.stock === 0 && item.type !== ProductType.SERVICE}
-                      className="p-4 themed-bg-secondary border themed-border rounded-2xl text-left hover:border-[#4F6EF6]/30 transition-all group disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <p className="font-black themed-text text-sm leading-tight group-hover:text-[#4F6EF6] transition-colors">{item.name}</p>
-                        {item.stock < 10 && item.type !== ProductType.SERVICE && (
-                          <span className="text-[8px] text-red-500 font-black uppercase">Low</span>
-                        )}
+                {/* Product Grid — scrollable, keeps search pinned above */}
+                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pb-2">
+                    {filteredInventory.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => { addToCart(item); setSearchQuery(''); }}
+                        disabled={item.stock === 0 && item.type !== ProductType.SERVICE}
+                        className="p-4 themed-bg-secondary border themed-border rounded-2xl text-left hover:border-[#4F6EF6]/30 transition-all group disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <p className="font-black themed-text text-sm leading-tight group-hover:text-[#4F6EF6] transition-colors">{item.name}</p>
+                          {item.stock < 10 && item.type !== ProductType.SERVICE && (
+                            <span className="text-[8px] text-red-500 font-black uppercase shrink-0 ml-1">Low</span>
+                          )}
+                        </div>
+                        <p className="text-[#4F6EF6] font-black text-base font-mono">KES {item.price.toLocaleString()}</p>
+                        <p className="text-[10px] themed-text-dim mt-0.5">{item.category} {item.type !== ProductType.SERVICE && `· ${item.stock}`}</p>
+                      </button>
+                    ))}
+                    {filteredInventory.length === 0 && (
+                      <div className="col-span-full py-16 flex flex-col items-center justify-center opacity-30">
+                        <Search size={32} className="themed-text-dim mb-3" />
+                        <p className="text-sm font-black themed-text uppercase tracking-widest">No items found</p>
                       </div>
-                      <p className="text-[#4F6EF6] font-black text-lg font-mono">KES {item.price.toLocaleString()}</p>
-                      <p className="text-[10px] themed-text-dim mt-1">{item.category} · Stock: {item.stock}</p>
-                    </button>
-                  ))}
+                    )}
+                  </div>
                 </div>
 
                 {/* Cart */}
@@ -1336,6 +1340,22 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
                   onEdit={(inv: Invoice) => setEditingInvoice(inv)}
                   onReceive={handleInvoiceReceive}
                   onDelete={handleInvoiceDelete}
+                  onConfirmDialog={showConfirm}
+                />
+              </motion.div>
+            )}
+
+            {activeTab === 'appointments' && isAppointmentBusiness && isManagement && (
+              <motion.div key="appointments" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col">
+                <AppointmentsManager
+                  appointments={appointments}
+                  setAppointments={setAppointments}
+                  staff={staff}
+                  inventory={inventory.filter(i => i.type === ProductType.SERVICE)}
+                  currentUser={currentUser}
+                  addAuditLog={addAuditLog}
+                  editingAppointment={editingAppointment}
+                  setEditingAppointment={setEditingAppointment}
                   onConfirmDialog={showConfirm}
                 />
               </motion.div>
@@ -1646,72 +1666,72 @@ function TabCard({ tab, onStatusChange, onPrint, onInvoice, onDelete, isDebt = f
   staffName: string;
 }) {
   return (
-    <div className="p-8 themed-bg-secondary border themed-border rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col gap-6">
-      {onPrint && (
-        <div className="absolute top-8 right-8 z-10 flex gap-2">
-          {onDelete && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="p-2 bg-red-500/5 hover:bg-red-500/20 text-red-500/50 hover:text-red-500 rounded-xl transition-all border border-transparent hover:border-red-500/20"
-              title="Delete Tab"
-            >
-              <Trash2 size={16} />
-            </button>
-          )}
+    <div className="p-6 themed-bg-secondary border themed-border rounded-[2rem] shadow-xl flex flex-col gap-5">
+      {/* Header row: customer + status badge + action icons */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[9px] themed-text-dim uppercase font-black tracking-[0.2em] mb-0.5">Holder</p>
+          <h4 className="text-lg font-black themed-text truncate leading-tight">{tab.customerName}</h4>
+          <p className="text-[10px] themed-text-dim font-bold mt-0.5">Served by: <span className="themed-text">{staffName}</span></p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black shadow-sm ${isDebt ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-[#4F6EF6]/10 text-[#4F6EF6] border border-[#4F6EF6]/20'} uppercase tracking-widest`}>
+            {tab.status}
+          </div>
           {onInvoice && (
             <button
               onClick={(e) => { e.stopPropagation(); onInvoice(); }}
-              className="p-2 bg-black/5 hover:bg-emerald-500/15 hover:text-emerald-400 themed-text-dim rounded-xl transition-all border themed-border print:hidden"
-              title="Print Customer Invoice (A4)"
+              className="p-1.5 bg-black/5 hover:bg-emerald-500/15 hover:text-emerald-400 themed-text-dim rounded-xl transition-all border themed-border print:hidden"
+              title="Customer Invoice (A4)"
             >
-              <FileText size={16} />
+              <FileText size={14} />
             </button>
           )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onPrint(); }}
-            className="p-2 bg-black/5 hover:bg-[#4F6EF6]/20 hover:text-[#4F6EF6] themed-text-dim rounded-xl transition-all border themed-border print:hidden"
-            title="Print Receipt (Thermal)"
-          >
-            <Printer size={16} />
-          </button>
-        </div>
-      )}
-
-      <div>
-        <div className="flex items-start justify-between mb-6">
-          <div className="min-w-0 pr-20">
-            <p className="text-[9px] themed-text-dim uppercase font-black tracking-[0.2em] mb-1">Holder</p>
-            <h4 className="text-xl font-black themed-text truncate leading-tight">{tab.customerName}</h4>
-            <p className="text-[10px] themed-text-dim font-bold mt-1">Served by: <span className="themed-text">{staffName}</span></p>
-          </div>
-          <div className={`px-3 py-1 rounded-lg text-[10px] font-black shadow-sm ${isDebt ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-[#4F6EF6]/10 text-[#4F6EF6] border border-[#4F6EF6]/20'} uppercase tracking-widest`}>
-            {tab.status}
-          </div>
-        </div>
-
-        <div className="space-y-2.5 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-          {tab.items.map((item, idx) => (
-            <div key={idx} className="flex justify-between items-center text-[11px] font-medium tracking-tight">
-              <span className="themed-text-dim">{item.quantity}× {item.name}</span>
-              <span className="themed-text font-black">KES {(item.priceAtSale * item.quantity).toLocaleString()}</span>
-            </div>
-          ))}
+          {onPrint && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPrint(); }}
+              className="p-1.5 bg-black/5 hover:bg-[#4F6EF6]/20 hover:text-[#4F6EF6] themed-text-dim rounded-xl transition-all border themed-border print:hidden"
+              title="Print Receipt"
+            >
+              <Printer size={14} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="p-1.5 bg-red-500/5 hover:bg-red-500/20 text-red-500/40 hover:text-red-500 rounded-xl transition-all border border-transparent hover:border-red-500/20"
+              title="Delete Tab"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="pt-6 border-t themed-border">
-        <div className="flex justify-between items-end mb-6">
+      {/* Items list */}
+      <div className="space-y-2 max-h-28 overflow-y-auto custom-scrollbar">
+        {tab.items.map((item, idx) => (
+          <div key={idx} className="flex justify-between items-center text-[11px] font-medium">
+            <span className="themed-text-dim">{item.quantity}× {item.name}</span>
+            <span className="themed-text font-black">KES {(item.priceAtSale * item.quantity).toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer: total + action button */}
+      <div className="pt-4 border-t themed-border">
+        <div className="flex justify-between items-center mb-4">
           <div>
-            <p className="text-[9px] themed-text-dim uppercase font-black tracking-[0.2em] mb-1">Account Total</p>
+            <p className="text-[9px] themed-text-dim uppercase font-black tracking-[0.2em] mb-0.5">Total</p>
             <p className="text-2xl font-black themed-text tracking-tighter leading-none">KES {tab.total.toLocaleString()}</p>
           </div>
-          <p className="text-[8px] themed-text-dim font-black uppercase opacity-20">ID REF: {tab.id.slice(0, 8)}</p>
+          <p className="text-[8px] themed-text-dim font-black uppercase opacity-20 text-right">REF: {tab.id.slice(0, 8)}</p>
         </div>
         <button
           onClick={onStatusChange}
-          className={`w-full py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all active:scale-95 shadow-lg ${isDebt ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-black/5 themed-text themed-border hover:bg-black/10'}`}
+          className={`w-full py-3.5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all active:scale-95 shadow-lg ${isDebt ? 'bg-[#4F6EF6] text-white hover:bg-[#3D5CE4]' : 'bg-black/5 themed-text border themed-border hover:bg-black/10'}`}
         >
-          {isDebt ? 'Settle Balance' : 'Modify Registry'}
+          {isDebt ? 'Process Payment →' : 'Modify Registry'}
         </button>
       </div>
     </div>
@@ -3115,6 +3135,285 @@ function StaffEditModal({ staff, onConfirm, onCancel, currentUser }: { staff: an
             className="py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100 shadow-[0_10px_20px_rgba(0,255,136,0.3)]"
           >
             AUTHORIZE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppointmentsManager({ appointments, setAppointments, staff, inventory, currentUser, addAuditLog, editingAppointment, setEditingAppointment, onConfirmDialog }: any) {
+  const [filter, setFilter] = useState<'all' | 'scheduled' | 'in_progress' | 'done' | 'cancelled'>('all');
+  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+
+  const today = new Date().toISOString().split('T')[0];
+  const filtered = appointments.filter((a: Appointment) => {
+    const matchStatus = filter === 'all' || a.status === filter;
+    const matchDate = !dateFilter || a.date === dateFilter;
+    return matchStatus && matchDate;
+  }).sort((a: Appointment, b: Appointment) => a.time.localeCompare(b.time));
+
+  const statusColor: Record<string, string> = {
+    scheduled:   'bg-[#4F6EF6]/10 text-[#4F6EF6] border-[#4F6EF6]/20',
+    in_progress: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    done:        'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    cancelled:   'bg-red-500/10 text-red-400 border-red-500/20',
+  };
+
+  const advanceStatus = (appt: Appointment) => {
+    const next: Record<string, Appointment['status']> = {
+      scheduled: 'in_progress', in_progress: 'done', done: 'done', cancelled: 'cancelled',
+    };
+    const updated = appointments.map((a: Appointment) =>
+      a.id === appt.id ? { ...a, status: next[a.status] } : a
+    );
+    setAppointments(updated);
+    addAuditLog(currentUser, 'Appointment Updated', `${appt.clientName} → ${next[appt.status]}`);
+  };
+
+  const cancelAppt = (appt: Appointment) => {
+    onConfirmDialog('Cancel Appointment', `Cancel appointment for ${appt.clientName}?`, () => {
+      setAppointments(appointments.map((a: Appointment) =>
+        a.id === appt.id ? { ...a, status: 'cancelled' } : a
+      ));
+      addAuditLog(currentUser, 'Appointment Cancelled', `Cancelled for ${appt.clientName}`);
+    }, 'danger');
+  };
+
+  const deleteAppt = (appt: Appointment) => {
+    onConfirmDialog('Delete Appointment', `Permanently remove appointment for ${appt.clientName}?`, () => {
+      setAppointments(appointments.filter((a: Appointment) => a.id !== appt.id));
+      addAuditLog(currentUser, 'Appointment Deleted', `Deleted for ${appt.clientName}`);
+    }, 'danger');
+  };
+
+  return (
+    <div className="h-full flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black themed-text tracking-tighter">Appointments</h2>
+          <p className="themed-text-dim text-sm">Client bookings, schedule & status</p>
+        </div>
+        <button
+          onClick={() => setEditingAppointment({ id: 'NEW' } as Appointment)}
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#4F6EF6] text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all shadow-[0_8px_20px_rgba(79,110,246,0.3)] shrink-0"
+        >
+          <Plus size={14} /> New
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <input
+          type="date"
+          value={dateFilter}
+          onChange={e => setDateFilter(e.target.value)}
+          className="themed-bg-secondary border themed-border rounded-2xl py-2.5 px-4 themed-text text-sm focus:outline-none focus:border-[#4F6EF6]/40"
+        />
+        <div className="flex gap-2 flex-wrap">
+          {(['all', 'scheduled', 'in_progress', 'done', 'cancelled'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setFilter(s)}
+              className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${filter === s ? 'bg-[#4F6EF6] text-white' : 'themed-bg-secondary border themed-border themed-text-dim hover:themed-text'}`}
+            >
+              {s.replace('_', ' ')}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1">
+        {filtered.map((appt: Appointment) => {
+          const assignedStaff = staff.find((s: any) => s.id === appt.staffId);
+          return (
+            <div key={appt.id} className="p-5 themed-bg-secondary border themed-border rounded-2xl flex flex-col sm:flex-row sm:items-center gap-4 hover:border-[#4F6EF6]/20 transition-all shadow-sm">
+              {/* Time column */}
+              <div className="text-center w-16 shrink-0">
+                <p className="text-xl font-black text-[#4F6EF6] font-mono leading-none">{appt.time}</p>
+                <p className="text-[9px] themed-text-dim font-black uppercase tracking-widest mt-1">{appt.duration}min</p>
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h4 className="font-black themed-text text-base">{appt.clientName}</h4>
+                  {appt.clientPhone && <span className="text-[10px] themed-text-dim font-mono">{appt.clientPhone}</span>}
+                </div>
+                <p className="text-sm themed-text-dim font-medium">{appt.serviceName}</p>
+                {assignedStaff && <p className="text-[10px] themed-text-dim mt-0.5">Staff: <span className="themed-text font-bold">{assignedStaff.name}</span></p>}
+                {appt.notes && <p className="text-[10px] text-[#4F6EF6]/60 mt-1 italic">{appt.notes}</p>}
+              </div>
+
+              {/* Status + actions */}
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${statusColor[appt.status]}`}>
+                  {appt.status.replace('_', ' ')}
+                </span>
+                {appt.status !== 'done' && appt.status !== 'cancelled' && (
+                  <button
+                    onClick={() => advanceStatus(appt)}
+                    className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
+                  >
+                    {appt.status === 'scheduled' ? 'Start' : 'Done'}
+                  </button>
+                )}
+                <button onClick={() => setEditingAppointment(appt)} className="p-2 themed-text-dim hover:text-[#4F6EF6] border themed-border rounded-xl transition-all">
+                  <Settings size={14} />
+                </button>
+                {appt.status !== 'cancelled' && (
+                  <button onClick={() => cancelAppt(appt)} className="p-2 text-amber-400/50 hover:text-amber-400 border border-transparent hover:border-amber-500/20 rounded-xl transition-all">
+                    <X size={14} />
+                  </button>
+                )}
+                <button onClick={() => deleteAppt(appt)} className="p-2 text-red-500/40 hover:text-red-500 border border-transparent hover:border-red-500/20 rounded-xl transition-all">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-48 opacity-20">
+            <Calendar size={36} className="themed-text-dim mb-3" />
+            <p className="text-sm font-black themed-text uppercase tracking-widest">No appointments {dateFilter === today ? 'today' : 'for this date'}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      <AnimatePresence>
+        {editingAppointment && (
+          <AppointmentEditModal
+            appt={editingAppointment}
+            staff={staff}
+            services={inventory}
+            onConfirm={(data: Appointment) => {
+              if (data.id === 'NEW') {
+                const newAppt = { ...data, id: `appt_${Date.now()}`, createdAt: Date.now() };
+                setAppointments([...appointments, newAppt]);
+                addAuditLog(currentUser, 'Appointment Created', `Booked ${data.clientName} for ${data.serviceName}`);
+              } else {
+                setAppointments(appointments.map((a: Appointment) => a.id === data.id ? data : a));
+                addAuditLog(currentUser, 'Appointment Updated', `Updated ${data.clientName}`);
+              }
+              setEditingAppointment(null);
+            }}
+            onCancel={() => setEditingAppointment(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function AppointmentEditModal({ appt, staff, services, onConfirm, onCancel }: {
+  appt: Appointment;
+  staff: any[];
+  services: any[];
+  onConfirm: (a: Appointment) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<Appointment>({
+    id: appt.id,
+    clientName: appt.clientName || '',
+    clientPhone: appt.clientPhone || '',
+    serviceName: appt.serviceName || '',
+    serviceId: appt.serviceId || '',
+    staffId: appt.staffId || (staff[0]?.id ?? ''),
+    date: appt.date || new Date().toISOString().split('T')[0],
+    time: appt.time || '09:00',
+    duration: appt.duration || 60,
+    notes: appt.notes || '',
+    status: appt.status || 'scheduled',
+    createdAt: appt.createdAt || Date.now(),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+      <div className="w-full max-w-md themed-bg-secondary border themed-border rounded-[2.5rem] p-8 shadow-2xl my-4">
+        <h3 className="text-2xl font-black themed-text mb-1">{appt.id === 'NEW' ? 'New Appointment' : 'Edit Appointment'}</h3>
+        <p className="themed-text-dim text-[10px] uppercase tracking-widest font-black mb-6">MADIS Scheduling</p>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[9px] themed-text-dim uppercase font-black tracking-widest block">Client Name</label>
+            <input type="text" autoFocus value={form.clientName} onChange={e => setForm({ ...form, clientName: e.target.value })}
+              className="w-full themed-bg-primary border themed-border rounded-2xl py-3.5 px-5 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold"
+              placeholder="e.g. Jane Wanjiru" />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[9px] themed-text-dim uppercase font-black tracking-widest block">Phone (optional)</label>
+            <input type="tel" value={form.clientPhone} onChange={e => setForm({ ...form, clientPhone: e.target.value })}
+              className="w-full themed-bg-primary border themed-border rounded-2xl py-3.5 px-5 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold"
+              placeholder="+254 7XX XXX XXX" />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[9px] themed-text-dim uppercase font-black tracking-widest block">Service</label>
+            {services.length > 0 ? (
+              <select value={form.serviceId} onChange={e => {
+                const svc = services.find((s: any) => s.id === e.target.value);
+                setForm({ ...form, serviceId: e.target.value, serviceName: svc?.name || '' });
+              }} className="w-full themed-bg-primary border themed-border rounded-2xl py-3.5 px-5 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none">
+                <option value="">Select service…</option>
+                {services.map((s: any) => <option key={s.id} value={s.id}>{s.name} — KES {s.price}</option>)}
+              </select>
+            ) : (
+              <input type="text" value={form.serviceName} onChange={e => setForm({ ...form, serviceName: e.target.value })}
+                className="w-full themed-bg-primary border themed-border rounded-2xl py-3.5 px-5 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold"
+                placeholder="e.g. Deep Tissue Massage" />
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[9px] themed-text-dim uppercase font-black tracking-widest block">Assigned Staff</label>
+            <select value={form.staffId} onChange={e => setForm({ ...form, staffId: e.target.value })}
+              className="w-full themed-bg-primary border themed-border rounded-2xl py-3.5 px-5 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none">
+              {staff.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[9px] themed-text-dim uppercase font-black tracking-widest block">Date</label>
+              <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
+                className="w-full themed-bg-primary border themed-border rounded-2xl py-3.5 px-4 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[9px] themed-text-dim uppercase font-black tracking-widest block">Time</label>
+              <input type="time" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })}
+                className="w-full themed-bg-primary border themed-border rounded-2xl py-3.5 px-4 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[9px] themed-text-dim uppercase font-black tracking-widest block">Duration (minutes)</label>
+            <select value={form.duration} onChange={e => setForm({ ...form, duration: Number(e.target.value) })}
+              className="w-full themed-bg-primary border themed-border rounded-2xl py-3.5 px-5 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none">
+              {[15, 30, 45, 60, 90, 120].map(d => <option key={d} value={d}>{d} minutes</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[9px] themed-text-dim uppercase font-black tracking-widest block">Notes (optional)</label>
+            <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2}
+              className="w-full themed-bg-primary border themed-border rounded-2xl py-3.5 px-5 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-medium resize-none text-sm"
+              placeholder="Allergies, preferences, etc." />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mt-6">
+          <button onClick={onCancel} className="py-4 bg-black/5 themed-text-dim border themed-border rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black/10 transition-all">Cancel</button>
+          <button
+            onClick={() => onConfirm(form)}
+            disabled={!form.clientName || !form.serviceName || !form.staffId}
+            className="py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 shadow-[0_10px_20px_rgba(79,110,246,0.3)]"
+          >
+            {appt.id === 'NEW' ? 'Book' : 'Save'}
           </button>
         </div>
       </div>

@@ -144,9 +144,10 @@ export const Reports: React.FC<ReportsProps> = ({ tabs, inventory, staff }) => {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0F0F0F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem' }}
-                  itemStyle={{ color: '#FFF' }}
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'var(--chart-tooltip-bg)', border: '1px solid var(--chart-tooltip-border)', borderRadius: '1rem' }}
+                  itemStyle={{ color: 'var(--chart-tooltip-text)' }}
+                  labelStyle={{ color: 'var(--chart-tooltip-dim)' }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -170,19 +171,20 @@ export const Reports: React.FC<ReportsProps> = ({ tabs, inventory, staff }) => {
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.staffPerf} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.05)" />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--chart-grid)" />
                 <XAxis type="number" hide />
                 <YAxis 
                   dataKey="name" 
                   type="category" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 900 }}
+                  tick={{ fill: 'var(--chart-text)', fontSize: 10, fontWeight: 900 }}
                   width={100}
                 />
                 <Tooltip 
-                   cursor={{ fill: 'rgba(255,255,255,0.02)' }}
-                   contentStyle={{ backgroundColor: '#0F0F0F', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem' }}
+                   cursor={{ fill: 'var(--chart-grid)' }}
+                   contentStyle={{ backgroundColor: 'var(--chart-tooltip-bg)', border: '1px solid var(--chart-tooltip-border)', borderRadius: '1rem' }}
+                   itemStyle={{ color: 'var(--chart-tooltip-text)' }}
                 />
                 <Bar dataKey="sales" fill="#00FF88" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>

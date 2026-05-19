@@ -295,18 +295,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ currentUser, tabs, invento
             <div className="h-[280px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={salesByHour} barSize={salesByHour.length > 15 ? 12 : 22}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                   <XAxis
                     dataKey="hour"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 10, fontWeight: 700 }}
+                    tick={{ fill: 'var(--chart-text)', fontSize: 10, fontWeight: 700 }}
                     dy={10}
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 10, fontWeight: 700 }}
+                    tick={{ fill: 'var(--chart-text)', fontSize: 10, fontWeight: 700 }}
                     tickFormatter={(v) => v >= 1000 ? `${v/1000}k` : v}
                     width={36}
                   />

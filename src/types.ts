@@ -103,6 +103,23 @@ export interface BusinessProfile {
   createdAt: number;
 }
 
+// ── Appointments ──────────────────────────────────────────────────────────────
+
+export interface Appointment {
+  id: string;
+  clientName: string;
+  clientPhone?: string;
+  serviceName: string;
+  serviceId?: string;
+  staffId: string;
+  date: string;
+  time: string;
+  duration: number;
+  notes?: string;
+  status: 'scheduled' | 'in_progress' | 'done' | 'cancelled';
+  createdAt: number;
+}
+
 // ── Invoice / Purchase Order types ────────────────────────────────────────────
 
 export type InvoiceStatus = 'draft' | 'sent' | 'received' | 'cancelled';
