@@ -11,6 +11,8 @@ import {
 import { PinPad } from './components/PinPad';
 import { TransactionModal } from './components/TransactionModal';
 import { Receipt } from './components/Receipt';
+import { CustomerInvoice } from './components/CustomerInvoice';
+import { TrialWarningModal } from './components/TrialWarningModal';
 import { Dashboard } from './components/Dashboard';
 import { Reports } from './components/Reports';
 import { ConfirmDialog, DialogState } from './components/ConfirmDialog';
@@ -249,6 +251,44 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
 
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const closeDialog = () => setDialog(null);
+
+  const TRIAL_WARN_KEY = `madis_trial_warn_dismissed_${uid}`;
+  const [showTrialWarning, setShowTrialWarning] = useState(() => {
+    if (!trialDaysLeft || trialDaysLeft > 3 || isDemo) return false;
+    try {
+      const dismissed = localStorage.getItem(TRIAL_WARN_KEY);
+      if (!dismissed) return true;
+      const parsed = JSON.parse(dismissed);
+      return Date.now() - parsed.at > 8 * 60 * 60 * 1000;
+    } catch { return true; }
+  });
+
+  const dismissTrialWarning = () => {
+    setShowTrialWarning(false);
+    try { localStorage.setItem(TRIAL_WARN_KEY, JSON.stringify({ at: Date.now() })); } catch {}
+  };
+
+  const [invoicePrintTab, setInvoicePrintTab] = useState<Tab | null>(null);
+
+  useEffect(() => {
+    if (isDemo || !trialDaysLeft) return;
+    const interval = setInterval(() => {
+      if (trialDaysLeft !== null && trialDaysLeft <= 3 && !showTrialWarning) {
+        try {
+          const dismissed = localStorage.getItem(TRIAL_WARN_KEY);
+          if (!dismissed) { setShowTrialWarning(true); return; }
+          const parsed = JSON.parse(dismissed);
+          if (Date.now() - parsed.at > 8 * 60 * 60 * 1000) setShowTrialWarning(true);
+        } catch { setShowTrialWarning(true); }
+      }
+    }, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [trialDaysLeft, isDemo, showTrialWarning]);
+
+  const handlePrintCustomerInvoice = (tab: Tab) => {
+    setInvoicePrintTab(tab);
+    setTimeout(() => { window.print(); }, 100);
+  };
 
   const [cart, setCart] = useState<TabItem[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -782,6 +822,22 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
         tagline={posSettings.receiptTagline}
       />
     )}
+    {invoicePrintTab && (
+      <CustomerInvoice
+        tab={invoicePrintTab}
+        businessName={businessName}
+        staffName={staff.find(s => s.id === invoicePrintTab.staffId)?.name || 'Staff'}
+      />
+    )}
+    <AnimatePresence>
+      {showTrialWarning && trialDaysLeft !== null && !isDemo && (
+        <TrialWarningModal
+          daysLeft={trialDaysLeft}
+          onSubscribe={() => { setShowTrialWarning(false); onSubscribeNow?.(); }}
+          onDismiss={dismissTrialWarning}
+        />
+      )}
+    </AnimatePresence>
     {isDemo && (
       <div className="fixed top-0 left-0 right-0 z-[100] bg-[#4F6EF6] text-white text-xs font-bold flex items-center justify-between px-4 py-2 print:hidden">
         <span className="flex items-center gap-2">
@@ -1179,6 +1235,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
                       staffName={staff.find(s => s.id === tab.staffId)?.name || 'Staff'}
                       onStatusChange={() => manageTab(tab.id)}
                       onPrint={() => manualPrint(tab)}
+                      onInvoice={() => handlePrintCustomerInvoice(tab)}
                       onDelete={isManagement ? () => handleDeleteTab(tab.id, tab.customerName) : undefined}
                     />
                   ))}
@@ -1205,6 +1262,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
                       staffName={staff.find(s => s.id === tab.staffId)?.name || 'Staff'}
                       onStatusChange={() => settleTab(tab.id)}
                       onPrint={() => manualPrint(tab)}
+                      onInvoice={() => handlePrintCustomerInvoice(tab)}
                       onDelete={isOwnerOrAdmin ? () => handleDeleteTab(tab.id, tab.customerName) : undefined}
                       isDebt
                     />
@@ -1543,10 +1601,11 @@ function NavItem({ active, icon: Icon, label, onClick }: { active: boolean; icon
   );
 }
 
-function TabCard({ tab, onStatusChange, onPrint, onDelete, isDebt = false, staffName }: {
+function TabCard({ tab, onStatusChange, onPrint, onInvoice, onDelete, isDebt = false, staffName }: {
   tab: Tab;
   onStatusChange: () => void;
   onPrint: () => void;
+  onInvoice?: () => void;
   onDelete?: () => void;
   isDebt?: boolean;
   staffName: string;
@@ -1564,10 +1623,19 @@ function TabCard({ tab, onStatusChange, onPrint, onDelete, isDebt = false, staff
               <Trash2 size={16} />
             </button>
           )}
+          {onInvoice && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onInvoice(); }}
+              className="p-2 bg-black/5 hover:bg-emerald-500/15 hover:text-emerald-400 themed-text-dim rounded-xl transition-all border themed-border print:hidden"
+              title="Print Customer Invoice (A4)"
+            >
+              <FileText size={16} />
+            </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onPrint(); }}
             className="p-2 bg-black/5 hover:bg-[#4F6EF6]/20 hover:text-[#4F6EF6] themed-text-dim rounded-xl transition-all border themed-border print:hidden"
-            title="Print Receipt"
+            title="Print Receipt (Thermal)"
           >
             <Printer size={16} />
           </button>

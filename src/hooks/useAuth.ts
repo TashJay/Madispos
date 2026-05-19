@@ -56,6 +56,30 @@ export function useAuth(): AuthState {
     return null;
   };
 
+  const TRIAL_CACHE_KEY = (uid: string) => `madis_trial_${uid}`;
+
+  const cacheTrialLocally = (uid: string, trialStartDate: number) => {
+    try {
+      localStorage.setItem(TRIAL_CACHE_KEY(uid), JSON.stringify({ trialStartDate, cachedAt: Date.now() }));
+    } catch {}
+  };
+
+  const getLocalTrialStart = (uid: string): number | null => {
+    try {
+      const raw = localStorage.getItem(TRIAL_CACHE_KEY(uid));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed.trialStartDate ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const isTrialExpired = (trialStartDate: number) => {
+    const trialAge = (Date.now() - trialStartDate) / (1000 * 60 * 60 * 24);
+    return trialAge >= 14;
+  };
+
   const routeUser = async (user: FirebaseUser) => {
     setFirebaseUser(user);
     const p = await loadProfile(user);
@@ -71,23 +95,29 @@ export function useAuth(): AuthState {
       try {
         await setDoc(doc(db, 'users', user.uid), trialProfile, { merge: true });
         setProfile(trialProfile as BusinessProfile);
+        cacheTrialLocally(user.uid, (trialProfile as any).trialStartDate);
         setScreen('business-select');
       } catch {
         setScreen('subscription');
       }
     } else if (p.subscriptionStatus === 'trial') {
-      const trialAge = (Date.now() - (p.trialStartDate || p.createdAt || Date.now())) / (1000 * 60 * 60 * 24);
-      if (trialAge < 14) {
+      const trialStart = p.trialStartDate || p.createdAt || Date.now();
+      cacheTrialLocally(user.uid, trialStart);
+      if (!isTrialExpired(trialStart)) {
         setScreen(p.businessType ? 'pos' : 'business-select');
       } else {
         setScreen('subscription');
       }
-    } else if (p.subscriptionStatus !== 'active') {
-      setScreen('subscription');
-    } else if (!p.businessType) {
-      setScreen('business-select');
+    } else if (p.subscriptionStatus === 'active') {
+      if (p.subscriptionExpiry && Date.now() > p.subscriptionExpiry) {
+        setScreen('subscription');
+      } else if (!p.businessType) {
+        setScreen('business-select');
+      } else {
+        setScreen('pos');
+      }
     } else {
-      setScreen('pos');
+      setScreen('subscription');
     }
   };
 
