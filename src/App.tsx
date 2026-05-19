@@ -703,10 +703,14 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
 
         <button
           onClick={onLogout}
-          className="mt-8 flex items-center gap-2 text-white/20 hover:text-white/50 transition-colors text-xs"
+          className={`mt-8 flex items-center gap-2 transition-colors text-xs font-bold ${
+            isDemo
+              ? 'text-white/70 hover:text-white border border-white/15 hover:border-white/30 px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10'
+              : 'text-white/30 hover:text-white/60'
+          }`}
         >
           <LogOut size={14} />
-          Switch account
+          {isDemo ? 'Back to Home' : 'Switch account'}
         </button>
 
         <footer className="mt-8 text-[10px] text-[#4F6EF6]/40 uppercase tracking-widest font-bold">
@@ -1811,8 +1815,6 @@ interface CSVRow {
   category: string;
   price: number;
   stock: number;
-  type: string;
-  isQuickSell: boolean;
   errors: string[];
   valid: boolean;
 }
@@ -1822,12 +1824,10 @@ function parseCSVText(text: string, validCategories: string[]): CSVRow[] {
   if (lines.length < 2) return [];
 
   const header = lines[0].split(/[,;\t]/).map(h => h.trim().toLowerCase().replace(/[^a-z]/g, ''));
-  const nameIdx      = header.findIndex(h => h === 'name' || h === 'itemname' || h === 'product');
-  const catIdx       = header.findIndex(h => h === 'category' || h === 'cat');
-  const priceIdx     = header.findIndex(h => h === 'price' || h === 'cost' || h === 'amount');
-  const stockIdx     = header.findIndex(h => h === 'stock' || h === 'qty' || h === 'quantity');
-  const typeIdx      = header.findIndex(h => h === 'type' || h === 'producttype');
-  const qsIdx        = header.findIndex(h => h === 'quicksell' || h === 'quick' || h === 'featured');
+  const nameIdx  = header.findIndex(h => h === 'name' || h === 'itemname' || h === 'product');
+  const catIdx   = header.findIndex(h => h === 'category' || h === 'cat');
+  const priceIdx = header.findIndex(h => h === 'price' || h === 'cost' || h === 'amount');
+  const stockIdx = header.findIndex(h => h === 'stock' || h === 'qty' || h === 'quantity');
 
   const results: CSVRow[] = [];
 
@@ -1839,11 +1839,9 @@ function parseCSVText(text: string, validCategories: string[]): CSVRow[] {
     const category = catIdx  >= 0 ? cols[catIdx]  || '' : '';
     const rawPrice = priceIdx >= 0 ? cols[priceIdx] : '';
     const rawStock = stockIdx >= 0 ? cols[stockIdx] : '';
-    const rawType  = typeIdx  >= 0 ? (cols[typeIdx] || '').toUpperCase() : 'SERVICE';
-    const rawQS    = qsIdx    >= 0 ? cols[qsIdx]    : '';
 
-    if (!name)             errors.push('Name is required');
-    if (!category)         errors.push('Category is required');
+    if (!name)     errors.push('Name is required');
+    if (!category) errors.push('Category is required');
 
     const price = parseFloat(rawPrice.replace(/[^0-9.]/g, ''));
     const stock = parseInt(rawStock.replace(/[^0-9]/g, ''), 10);
@@ -1851,18 +1849,11 @@ function parseCSVText(text: string, validCategories: string[]): CSVRow[] {
     if (isNaN(price) || price < 0) errors.push('Invalid price');
     if (isNaN(stock) || stock < 0) errors.push('Invalid stock');
 
-    const validTypes = ['DRINK', 'FOOD', 'ROOM', 'SERVICE'];
-    const type = validTypes.includes(rawType) ? rawType : 'SERVICE';
-
-    const isQuickSell = rawQS.toLowerCase() === 'true' || rawQS === '1' || rawQS.toLowerCase() === 'yes';
-
     results.push({
       name,
       category: category || 'General',
       price: isNaN(price) ? 0 : Math.round(price),
       stock: isNaN(stock) ? 0 : stock,
-      type,
-      isQuickSell,
       errors,
       valid: errors.length === 0,
     });
@@ -1909,9 +1900,9 @@ function CSVImportModal({ businessType, existingCategories = [], onImport, onCan
   const downloadTemplate = () => {
     const cats = suggestedCategories.slice(0, 3).join(' / ');
     const csv = [
-      'name,category,price,stock,type,quickSell',
-      `Example Item,${suggestedCategories[0] || 'General'},500,100,SERVICE,true`,
-      `Another Item,${suggestedCategories[1] || 'General'},1200,50,DRINK,false`,
+      'name,category,price,stock',
+      `Example Item,${suggestedCategories[0] || 'General'},500,100`,
+      `Another Item,${suggestedCategories[1] || 'General'},1200,50`,
     ].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -1983,14 +1974,12 @@ function CSVImportModal({ businessType, existingCategories = [], onImport, onCan
                 <p className="text-xs font-black themed-text uppercase tracking-widest flex items-center gap-2">
                   <FileText size={13} className="text-[#4F6EF6]" /> Required CSV columns
                 </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { col: 'name', desc: 'Product name', req: true },
                     { col: 'category', desc: 'e.g. Beers, Hair', req: true },
                     { col: 'price', desc: 'Amount in KES', req: true },
                     { col: 'stock', desc: 'Starting quantity', req: true },
-                    { col: 'type', desc: 'DRINK/FOOD/ROOM/SERVICE', req: false },
-                    { col: 'quickSell', desc: 'true or false', req: false },
                   ].map(({ col, desc, req }) => (
                     <div key={col} className="bg-black/10 rounded-xl px-3 py-2">
                       <span className="font-mono text-[#4F6EF6] text-xs font-black">{col}</span>
@@ -2043,7 +2032,6 @@ function CSVImportModal({ businessType, existingCategories = [], onImport, onCan
                       <th className="py-3 px-4 themed-text-dim font-black uppercase tracking-widest">Category</th>
                       <th className="py-3 px-4 themed-text-dim font-black uppercase tracking-widest">Price</th>
                       <th className="py-3 px-4 themed-text-dim font-black uppercase tracking-widest">Stock</th>
-                      <th className="py-3 px-4 themed-text-dim font-black uppercase tracking-widest">Type</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y themed-border">
@@ -2059,7 +2047,6 @@ function CSVImportModal({ businessType, existingCategories = [], onImport, onCan
                         <td className="py-2.5 px-4 themed-text-dim">{row.category}</td>
                         <td className="py-2.5 px-4 font-mono text-[#4F6EF6]">KES {row.price.toLocaleString()}</td>
                         <td className="py-2.5 px-4 themed-text">{row.stock}</td>
-                        <td className="py-2.5 px-4 themed-text-dim capitalize">{row.type.toLowerCase()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -2660,55 +2647,40 @@ function InventoryEditModal({ item, businessType = '', existingCategories = [], 
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Category</label>
-              <select
-                value={showCustom ? '__custom__' : (formData.category || '')}
+          <div className="space-y-2">
+            <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Category</label>
+            <select
+              value={showCustom ? '__custom__' : (formData.category || '')}
+              onChange={(e) => {
+                if (e.target.value === '__custom__') {
+                  setShowCustom(true);
+                  setFormData({ ...formData, category: customCategory });
+                } else {
+                  setShowCustom(false);
+                  setFormData({ ...formData, category: e.target.value });
+                }
+              }}
+              className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none"
+            >
+              <option value="" disabled>Select category…</option>
+              {suggestedCategories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+              <option value="__custom__">+ New category…</option>
+            </select>
+            {showCustom && (
+              <input
+                type="text"
+                autoFocus
+                value={customCategory}
                 onChange={(e) => {
-                  if (e.target.value === '__custom__') {
-                    setShowCustom(true);
-                    setFormData({ ...formData, category: customCategory });
-                  } else {
-                    setShowCustom(false);
-                    setFormData({ ...formData, category: e.target.value });
-                  }
+                  setCustomCategory(e.target.value);
+                  setFormData({ ...formData, category: e.target.value });
                 }}
-                className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none"
-              >
-                <option value="" disabled>Select category…</option>
-                {suggestedCategories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-                <option value="__custom__">+ New category…</option>
-              </select>
-              {showCustom && (
-                <input
-                  type="text"
-                  autoFocus
-                  value={customCategory}
-                  onChange={(e) => {
-                    setCustomCategory(e.target.value);
-                    setFormData({ ...formData, category: e.target.value });
-                  }}
-                  className="w-full themed-bg-primary border border-[#4F6EF6]/40 rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold mt-2"
-                  placeholder="Type new category name…"
-                />
-              )}
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Type</label>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold appearance-none"
-              >
-                <option value="DRINK">Drink</option>
-                <option value="FOOD">Food</option>
-                <option value="ROOM">Room / Unit</option>
-                <option value="SERVICE">Service</option>
-              </select>
-            </div>
+                className="w-full themed-bg-primary border border-[#4F6EF6]/40 rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold mt-2"
+                placeholder="Type new category name…"
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
