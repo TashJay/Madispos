@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { BusinessProfile } from '../types';
 import {
@@ -41,6 +41,7 @@ interface Subscriber extends BusinessProfile {
 interface Stats {
   total: number;
   active: number;
+  trial: number;
   expired: number;
   pending: number;
   expiringSoon: number;
@@ -54,6 +55,7 @@ interface Stats {
 function computeStats(subscribers: Subscriber[]): Stats {
   const now = Date.now();
   const active = subscribers.filter(s => s.subscriptionStatus === 'active').length;
+  const trial = subscribers.filter(s => s.subscriptionStatus === 'trial').length;
   const expired = subscribers.filter(s => s.subscriptionStatus === 'expired').length;
   const pending = subscribers.filter(s => s.subscriptionStatus === 'pending').length;
   const expiringSoon = subscribers.filter(s => s.isExpiringSoon && s.subscriptionStatus === 'active').length;
@@ -86,7 +88,7 @@ function computeStats(subscribers: Subscriber[]): Stats {
 
   return {
     total: subscribers.length,
-    active, expired, pending, expiringSoon,
+    active, trial, expired, pending, expiringSoon,
     mrr: Math.round((active * PLAN_PRICE_KES) / 12),
     arr: active * PLAN_PRICE_KES,
     byType, byMonth, recentSignups,
@@ -113,7 +115,7 @@ export function OwnerDashboard({ email, onLogout }: Props) {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, 'users'));
       const snap = await getDocs(q);
       const now = Date.now();
       const data: Subscriber[] = snap.docs.map(d => {
@@ -228,15 +230,16 @@ export function OwnerDashboard({ email, onLogout }: Props) {
               >
                 {/* KPI cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <KpiCard label="Total Subscribers" value={stats.total} icon={Users} color="#4F6EF6" />
-                  <KpiCard label="Active" value={stats.active} icon={CheckCircle} color="#00FF88" />
+                  <KpiCard label="Total Signups" value={stats.total} icon={Users} color="#4F6EF6" />
+                  <KpiCard label="Active Paid" value={stats.active} icon={CheckCircle} color="#00FF88" />
+                  <KpiCard label="Free Trial" value={stats.trial} icon={Zap} color="#a855f7" />
                   <KpiCard label="Annual Revenue" value={`KSh ${stats.arr.toLocaleString()}`} icon={DollarSign} color="#f97316" />
-                  <KpiCard label="Expiring (30d)" value={stats.expiringSoon} icon={AlertTriangle} color="#f59e0b" />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <KpiCard label="Expired" value={stats.expired} icon={XCircle} color="#ef4444" />
                   <KpiCard label="Pending Payment" value={stats.pending} icon={Clock} color="#a855f7" />
+                  <KpiCard label="Expiring (30d)" value={stats.expiringSoon} icon={AlertTriangle} color="#f59e0b" />
                   <KpiCard label="Est. Monthly Rev." value={`KSh ${stats.mrr.toLocaleString()}`} icon={TrendingUp} color="#06b6d4" />
                 </div>
 

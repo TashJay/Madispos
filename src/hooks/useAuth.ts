@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import {
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   GoogleAuthProvider,
   type User as FirebaseUser,
@@ -25,6 +28,7 @@ export interface AuthState {
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   activateSubscription: () => Promise<void>;
   saveBusinessProfile: (businessName: string, businessType: BusinessType, ownerName: string, ownerPin?: string) => Promise<void>;
@@ -52,43 +56,60 @@ export function useAuth(): AuthState {
     return null;
   };
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      setFirebaseUser(user);
-      if (user) {
-        const p = await loadProfile(user);
-        setProfile(p);
-        if (!p) {
-          // New user — start 14-day free trial
-          const trialProfile: Partial<BusinessProfile> = {
-            uid: user.uid,
-            email: user.email || '',
-            subscriptionStatus: 'trial',
-            trialStartDate: Date.now(),
-            createdAt: Date.now(),
-          } as any;
-          try {
-            await setDoc(doc(db, 'users', user.uid), trialProfile, { merge: true });
-            setProfile(trialProfile as BusinessProfile);
-            setScreen('business-select');
-          } catch {
-            setScreen('subscription');
-          }
-        } else if (p.subscriptionStatus === 'trial') {
-          const trialAge = (Date.now() - (p.trialStartDate || p.createdAt || Date.now())) / (1000 * 60 * 60 * 24);
-          if (trialAge < 14) {
-            setScreen(p.businessType ? 'pos' : 'business-select');
-          } else {
-            setScreen('subscription');
-          }
-        } else if (p.subscriptionStatus !== 'active') {
-          setScreen('subscription');
-        } else if (!p.businessType) {
-          setScreen('business-select');
-        } else {
-          setScreen('pos');
-        }
+  const routeUser = async (user: FirebaseUser) => {
+    setFirebaseUser(user);
+    const p = await loadProfile(user);
+    setProfile(p);
+    if (!p) {
+      const trialProfile: Partial<BusinessProfile> = {
+        uid: user.uid,
+        email: user.email || '',
+        subscriptionStatus: 'trial',
+        trialStartDate: Date.now(),
+        createdAt: Date.now(),
+      } as any;
+      try {
+        await setDoc(doc(db, 'users', user.uid), trialProfile, { merge: true });
+        setProfile(trialProfile as BusinessProfile);
+        setScreen('business-select');
+      } catch {
+        setScreen('subscription');
+      }
+    } else if (p.subscriptionStatus === 'trial') {
+      const trialAge = (Date.now() - (p.trialStartDate || p.createdAt || Date.now())) / (1000 * 60 * 60 * 24);
+      if (trialAge < 14) {
+        setScreen(p.businessType ? 'pos' : 'business-select');
       } else {
+        setScreen('subscription');
+      }
+    } else if (p.subscriptionStatus !== 'active') {
+      setScreen('subscription');
+    } else if (!p.businessType) {
+      setScreen('business-select');
+    } else {
+      setScreen('pos');
+    }
+  };
+
+  useEffect(() => {
+    // Check for pending redirect result first (Google redirect sign-in)
+    getRedirectResult(auth)
+      .then(result => {
+        if (result?.user) {
+          // Handled by onAuthStateChanged below
+        }
+      })
+      .catch((e: any) => {
+        if (e?.code !== 'auth/no-current-user') {
+          setError(friendlyError(e?.code) || 'Google sign-in failed. Please try again.');
+        }
+      });
+
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        await routeUser(user);
+      } else {
+        setFirebaseUser(null);
         setProfile(null);
         setScreen('landing');
       }
@@ -99,11 +120,27 @@ export function useAuth(): AuthState {
 
   const signInWithGoogle = async () => {
     setError('');
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      const provider = new GoogleAuthProvider();
+      // Try popup first; fall back to redirect if popup is blocked
       await signInWithPopup(auth, provider);
     } catch (e: any) {
-      setError(e.message || 'Google sign-in failed');
+      const code = e?.code || '';
+      if (
+        code === 'auth/popup-blocked' ||
+        code === 'auth/cancelled-popup-request' ||
+        code === 'auth/popup-closed-by-user'
+      ) {
+        // Fall back to redirect flow
+        try {
+          await signInWithRedirect(auth, provider);
+        } catch (re: any) {
+          setError(friendlyError(re?.code) || 'Google sign-in failed. Please try again.');
+        }
+      } else {
+        setError(friendlyError(code) || e.message || 'Google sign-in failed');
+      }
     }
   };
 
@@ -122,6 +159,15 @@ export function useAuth(): AuthState {
       await createUserWithEmailAndPassword(auth, email, password);
     } catch (e: any) {
       setError(friendlyError(e.code));
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    setError('');
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (e: any) {
+      throw new Error(friendlyError(e.code) || 'Could not send reset email. Please try again.');
     }
   };
 
@@ -149,7 +195,6 @@ export function useAuth(): AuthState {
       return;
     }
     setProfile(prev => ({ ...prev, ...partial } as BusinessProfile));
-    // If upgrading from trial (businessType already set), go straight to POS
     setScreen(profile?.businessType ? 'pos' : 'business-select');
   };
 
@@ -197,6 +242,7 @@ export function useAuth(): AuthState {
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
+    resetPassword,
     logout,
     activateSubscription,
     saveBusinessProfile,
@@ -214,10 +260,10 @@ function friendlyError(code: string): string {
     case 'auth/invalid-email': return 'Please enter a valid email address.';
     case 'auth/too-many-requests': return 'Too many attempts. Please wait a moment and try again.';
     case 'auth/invalid-credential': return 'Incorrect email or password. If you are new, click "Create Account" first.';
-    case 'auth/unauthorized-domain': return 'This domain is not authorised for sign-in. Please add it to your Firebase Console under Authentication → Settings → Authorised Domains.';
-    case 'auth/popup-blocked': return 'Pop-up was blocked by your browser. Please allow pop-ups for this site and try again.';
+    case 'auth/unauthorized-domain': return 'This domain is not authorised for Google sign-in. Go to Firebase Console → Authentication → Settings → Authorised Domains and add this site\'s domain.';
+    case 'auth/popup-blocked': return 'Pop-up was blocked. Redirecting to Google sign-in…';
     case 'auth/popup-closed-by-user': return 'Sign-in was cancelled. Please try again.';
-    case 'auth/operation-not-allowed': return 'This sign-in method is not enabled. Please enable it in Firebase Console.';
+    case 'auth/operation-not-allowed': return 'Google sign-in is not enabled. Please enable it in Firebase Console → Authentication → Sign-in methods.';
     case 'auth/network-request-failed': return 'Network error. Please check your connection and try again.';
     default: return 'Something went wrong. Please try again.';
   }

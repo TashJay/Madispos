@@ -158,6 +158,7 @@ function LandingPageRouter({ auth, onDemo }: { auth: any; onDemo: (type: 'bar' |
         onSignInWithEmail={auth.signInWithEmail}
         onSignUpWithEmail={auth.signUpWithEmail}
         onSignInWithGoogle={auth.signInWithGoogle}
+        onResetPassword={auth.resetPassword}
         onBack={() => setAuthMode('hidden')}
         error={auth.error}
         clearError={auth.clearError}
