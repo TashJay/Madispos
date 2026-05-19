@@ -9,30 +9,40 @@ const PORT = parseInt(process.env.PORT || '5001', 10);
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
   httpOptions: {
-    apiVersion: '',
     baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
   },
 });
 
+const MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+
+async function callGemini(systemInstruction: string, history: any[], message: string): Promise<string> {
+  let lastErr: any;
+  for (const model of MODELS) {
+    try {
+      const chat = ai.chats.create({
+        model,
+        config: systemInstruction ? { systemInstruction } : {},
+        history: history || [],
+      });
+      const result = await chat.sendMessage({ message });
+      return result.text || '';
+    } catch (err: any) {
+      console.error(`Model ${model} failed:`, err?.message || err);
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { systemInstruction, history, message } = req.body;
-
-    if (!message) {
-      return res.status(400).json({ error: 'message is required' });
-    }
-
-    const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
-      config: systemInstruction ? { systemInstruction } : {},
-      history: history || [],
-    });
-
-    const result = await chat.sendMessage({ message });
-    return res.json({ text: result.text || '' });
+    if (!message) return res.status(400).json({ error: 'message is required' });
+    const text = await callGemini(systemInstruction || '', history || [], message);
+    return res.json({ text });
   } catch (err: any) {
     console.error('AI chat error:', err?.message || err);
-    return res.status(500).json({ error: 'AI request failed' });
+    return res.status(500).json({ error: 'AI request failed', detail: err?.message });
   }
 });
 

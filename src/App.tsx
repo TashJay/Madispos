@@ -6,7 +6,8 @@ import {
   History, Wifi, WifiOff, X, Check, Save, RotateCcw,
   Sun, Moon, Zap, Crown, Eye, EyeOff, ArrowDown, Printer,
   TrendingUp, Trash2, FileText, Download, Share, BarChart2, Play,
-  Sparkles, SlidersHorizontal, Upload, AlertTriangle, CheckCircle2
+  Sparkles, SlidersHorizontal, Upload, AlertTriangle, CheckCircle2,
+  Maximize2, Minimize2
 } from 'lucide-react';
 import { PinPad } from './components/PinPad';
 import { TransactionModal } from './components/TransactionModal';
@@ -269,6 +270,26 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
   };
 
   const [invoicePrintTab, setInvoicePrintTab] = useState<Tab | null>(null);
+
+  const [isSalesFullscreen, setIsSalesFullscreen] = useState(false);
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement) setIsSalesFullscreen(false);
+    };
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+  const enterSalesFullscreen = async () => {
+    try { await document.documentElement.requestFullscreen(); setIsSalesFullscreen(true); } catch {}
+  };
+  const exitSalesFullscreen = async () => {
+    try { if (document.fullscreenElement) await document.exitFullscreen(); setIsSalesFullscreen(false); } catch {}
+  };
+
+  const handleRestockItem = (item: Product) => {
+    setActiveTab('invoices');
+    setEditingInvoice({ id: 'NEW', prefillItem: item } as any);
+  };
 
   useEffect(() => {
     if (isDemo || !trialDaysLeft) return;
@@ -1051,7 +1072,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
           </div>
         )}
 
-        <div className="p-4 md:p-8 space-y-8 h-full">
+        <div className="p-3 md:p-8 space-y-4 md:space-y-8 h-full">
           <AnimatePresence mode="wait">
             {activeTab === 'dashboard' && (
               <motion.div key="dashboard" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full">
@@ -1067,18 +1088,31 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
             )}
 
             {activeTab === 'sales' && (
-              <motion.div key="sales" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col gap-6">
+              <motion.div key="sales" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col gap-3 md:gap-6">
+                {/* Sales header row with fullscreen toggle */}
+                <div className="flex items-center justify-between">
+                  <p className="text-[9px] themed-text-dim uppercase font-black tracking-[0.3em]">Point of Sale</p>
+                  <button
+                    onClick={isSalesFullscreen ? exitSalesFullscreen : enterSalesFullscreen}
+                    className="flex items-center gap-1.5 text-[9px] themed-text-dim hover:text-[#4F6EF6] hover:border-[#4F6EF6]/30 border themed-border px-3 py-1.5 rounded-xl transition-all uppercase font-black tracking-widest"
+                    title={isSalesFullscreen ? 'Exit fullscreen' : 'Fullscreen mode'}
+                  >
+                    {isSalesFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+                    <span className="hidden sm:inline">{isSalesFullscreen ? 'Exit' : 'Fullscreen'}</span>
+                  </button>
+                </div>
+
                 {/* Speed Menu */}
                 {speedMenu.length > 0 && (
                   <div>
-                    <p className="text-[9px] themed-text-dim uppercase font-black tracking-[0.3em] mb-3">Quick Sell</p>
-                    <div className="flex flex-wrap gap-2">
+                    <p className="text-[9px] themed-text-dim uppercase font-black tracking-[0.3em] mb-2">Quick Sell</p>
+                    <div className="flex flex-wrap gap-1.5">
                       {speedMenu.map(item => (
                         <button
                           key={item.id}
                           onClick={() => addToCart(item)}
                           disabled={item.stock === 0 && item.type !== ProductType.SERVICE}
-                          className="px-4 py-2 bg-[#4F6EF6]/10 border border-[#4F6EF6]/20 text-[#4F6EF6] rounded-xl text-xs font-black hover:bg-[#4F6EF6]/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="px-3 py-1.5 bg-[#4F6EF6]/10 border border-[#4F6EF6]/20 text-[#4F6EF6] rounded-xl text-xs font-black hover:bg-[#4F6EF6]/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           {item.name}
                         </button>
@@ -1287,6 +1321,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
                   onConfirmDialog={showConfirm}
                   businessType={businessType}
                   onImportCSV={() => setShowCSVImport(true)}
+                  onRestockItem={handleRestockItem}
                 />
               </motion.div>
             )}
@@ -1712,7 +1747,7 @@ function PriceOverrideModal({ item, onConfirm, onCancel }: { item: TabItem; onCo
   );
 }
 
-function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, setEditingItem, onConfirmDialog, businessType, onImportCSV }: any) {
+function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, setEditingItem, onConfirmDialog, businessType, onImportCSV, onRestockItem }: any) {
   const deleteItem = (id: string) => {
     const item = inventory.find((i: Product) => i.id === id);
     onConfirmDialog(
@@ -1853,12 +1888,21 @@ function InventoryManager({ inventory, setInventory, addAuditLog, currentUser, s
                     </div>
                   </td>
                   <td className="py-6 px-8 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      <button onClick={() => setEditingItem(item)} className="p-3 bg-black/5 border themed-border rounded-2xl themed-text-dim hover:text-[#4F6EF6] hover:border-[#4F6EF6]/20 transition-all" title="Edit Item">
-                        <Settings size={18} />
+                    <div className="flex items-center justify-end gap-2">
+                      {item.stock < 10 && item.type !== ProductType.SERVICE && onRestockItem && (
+                        <button
+                          onClick={() => onRestockItem(item)}
+                          className="p-2.5 bg-amber-500/8 border border-amber-500/20 rounded-2xl text-amber-400 hover:bg-amber-500/15 transition-all"
+                          title="Create supplier restock invoice"
+                        >
+                          <ShoppingCart size={16} />
+                        </button>
+                      )}
+                      <button onClick={() => setEditingItem(item)} className="p-2.5 bg-black/5 border themed-border rounded-2xl themed-text-dim hover:text-[#4F6EF6] hover:border-[#4F6EF6]/20 transition-all" title="Edit Item">
+                        <Settings size={16} />
                       </button>
-                      <button onClick={() => deleteItem(item.id)} className="p-3 bg-red-500/5 border border-transparent hover:border-red-500/20 rounded-2xl text-red-500/50 hover:text-red-500 transition-all" title="Delete Item">
-                        <Trash2 size={18} />
+                      <button onClick={() => deleteItem(item.id)} className="p-2.5 bg-red-500/5 border border-transparent hover:border-red-500/20 rounded-2xl text-red-500/50 hover:text-red-500 transition-all" title="Delete Item">
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </td>
@@ -2676,12 +2720,15 @@ function InventoryEditModal({ item, businessType = '', existingCategories = [], 
   onConfirm: (updated: any) => void;
   onCancel: () => void;
 }) {
+  const isService = item.type === ProductType.SERVICE;
   const [formData, setFormData] = useState({
     ...item,
     price: item.price === 0 ? '' : item.price,
-    stock: item.stock === 0 ? '' : item.stock
+    stock: isService ? '' : (item.stock === 0 ? '' : item.stock),
+    type: item.type || 'DRINK',
   });
   const [customCategory, setCustomCategory] = useState('');
+  const itemIsService = formData.type === ProductType.SERVICE;
 
   const suggestedCategories = getBusinessCategories(businessType, existingCategories);
   const isCurrentCustom = formData.category && !suggestedCategories.includes(formData.category);
@@ -2691,17 +2738,53 @@ function InventoryEditModal({ item, businessType = '', existingCategories = [], 
     onConfirm({
       ...formData,
       price: Math.round(Number(formData.price || 0)),
-      stock: Number(formData.stock || 0)
+      stock: itemIsService ? 9999 : Number(formData.stock || 0),
+      type: itemIsService ? ProductType.SERVICE : (formData.type || 'DRINK'),
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-md themed-bg-secondary border themed-border rounded-[2.5rem] p-8 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+      <div className="w-full max-w-md themed-bg-secondary border themed-border rounded-[2.5rem] p-8 shadow-2xl my-4">
         <h3 className="text-2xl font-black themed-text mb-2">{item.id === 'NEW' ? 'New Inventory Item' : 'Edit Item'}</h3>
-        <p className="themed-text-dim text-sm mb-8 font-medium uppercase tracking-[0.2em]">MADIS Inventory System</p>
+        <p className="themed-text-dim text-sm mb-6 font-medium uppercase tracking-[0.2em]">MADIS Inventory System</p>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
+
+          {/* Item Type toggle */}
+          <div className="space-y-2">
+            <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Item Type</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, type: 'DRINK' })}
+                className={`flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all ${
+                  !itemIsService
+                    ? 'bg-[#4F6EF6] text-white border-[#4F6EF6]'
+                    : 'bg-black/5 themed-text-dim themed-border hover:border-[#4F6EF6]/30'
+                }`}
+              >
+                Physical / Product
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, type: ProductType.SERVICE })}
+                className={`flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all ${
+                  itemIsService
+                    ? 'bg-[#4F6EF6] text-white border-[#4F6EF6]'
+                    : 'bg-black/5 themed-text-dim themed-border hover:border-[#4F6EF6]/30'
+                }`}
+              >
+                Service
+              </button>
+            </div>
+            {itemIsService && (
+              <p className="text-[10px] text-[#4F6EF6]/70 font-medium">
+                Services don't have stock counts — they won't appear as low stock.
+              </p>
+            )}
+          </div>
+
           <div className="space-y-2">
             <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Item Name</label>
             <input
@@ -2711,7 +2794,7 @@ function InventoryEditModal({ item, businessType = '', existingCategories = [], 
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold"
-              placeholder="e.g. Tusker Cider, Manicure, Day Pass…"
+              placeholder={itemIsService ? 'e.g. Manicure, Full Body Massage, Day Pass…' : 'e.g. Tusker Cider, Chapati, Paracetamol…'}
             />
           </div>
 
@@ -2751,7 +2834,7 @@ function InventoryEditModal({ item, businessType = '', existingCategories = [], 
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid gap-4 ${itemIsService ? 'grid-cols-1' : 'grid-cols-2'}`}>
             <div className="space-y-2">
               <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Price (KES)</label>
               <input
@@ -2763,26 +2846,28 @@ function InventoryEditModal({ item, businessType = '', existingCategories = [], 
                 placeholder="0"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Stock Level</label>
-              <input
-                type="number"
-                required
-                value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold"
-                placeholder="0"
-              />
-            </div>
+            {!itemIsService && (
+              <div className="space-y-2">
+                <label className="text-[10px] themed-text-dim uppercase font-black tracking-widest block font-mono">Stock Level</label>
+                <input
+                  type="number"
+                  required
+                  value={formData.stock}
+                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                  className="w-full themed-bg-primary border themed-border rounded-2xl py-4 px-6 themed-text focus:outline-none focus:border-[#4F6EF6] transition-all font-bold"
+                  placeholder="0"
+                />
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mt-10">
+        <div className="grid grid-cols-2 gap-4 mt-8">
           <button onClick={onCancel} className="py-4 bg-black/5 themed-text-dim border themed-border rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black/10 transition-all font-mono">DISCARD</button>
           <button
             onClick={handleConfirm}
             disabled={!formData.name || !formData.category}
-            className="py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 shadow-[0_10px_20px_rgba(0,255,136,0.3)]"
+            className="py-4 bg-[#4F6EF6] text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-30 shadow-[0_10px_20px_rgba(79,110,246,0.3)]"
           >CONFIRM</button>
         </div>
       </div>
