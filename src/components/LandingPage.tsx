@@ -155,14 +155,29 @@ const faqs = [
   },
 ];
 
-const CHAT_QA: { q: string; a: string }[] = [
-  { q: 'How much does it cost?', a: 'MADIS starts at KSh 299/month. You get a 14-day free trial with no credit card required. Annual plans save you 30%.' },
-  { q: 'Is there a free trial?', a: 'Yes! 14 days of full access — no credit card, no commitment. All features included.' },
-  { q: 'What businesses does it support?', a: 'Bars, restaurants, cafés, spas, gyms, retail shops, pharmacies, hardware stores, rental/hotel, and more.' },
-  { q: 'Does it work in Kenya?', a: 'MADIS is built specifically for Kenya — with M-Pesa support, KSh pricing, and a deep understanding of African business operations.' },
-  { q: 'Can I see a demo?', a: 'Absolutely! Click "Try Demo" in the navigation to launch a live interactive demo — no login required.' },
-  { q: 'Is my data secure?', a: 'Yes. Data is encrypted, stored on Google Firebase, and each business gets a fully isolated database. GDPR compliant.' },
+const CHAT_QA: { keywords: string[]; a: string }[] = [
+  { keywords: ['price', 'cost', 'how much', 'pricing', 'fee', 'subscription', 'pay'], a: 'MADIS costs KSh 1,000 per year — that\'s less than KSh 3 a day. You get a 14-day free trial with no credit card required. All features are included in the single plan.' },
+  { keywords: ['trial', 'free', 'test', 'try'], a: 'Yes! You get 14 days of full access — no credit card, no commitment. All features included from day one.' },
+  { keywords: ['business', 'support', 'type', 'industry', 'work for'], a: 'MADIS supports bars, restaurants, cafés, spas, salons, gyms, retail shops, pharmacies, hardware stores, hotels, rental businesses, and more.' },
+  { keywords: ['kenya', 'africa', 'african', 'nairobi', 'local'], a: 'MADIS is built specifically for Kenya — KSh pricing, M-Pesa payment recording, and workflows designed for Kenyan businesses.' },
+  { keywords: ['demo', 'preview', 'tour', 'see it', 'watch'], a: 'Click "Try Demo" in the navigation to launch a live interactive demo — no login required. You can try a bar, spa, or gym demo.' },
+  { keywords: ['secure', 'security', 'safe', 'data', 'privacy', 'gdpr'], a: 'Yes. Your data is encrypted in transit and at rest, stored on Google Firebase, and each business gets a fully isolated database. GDPR compliant.' },
+  { keywords: ['mpesa', 'm-pesa', 'mobile money', 'payment'], a: 'MADIS records M-Pesa payments alongside cash — you log the transaction reference and the system tracks it. STK push integration is on our roadmap.' },
+  { keywords: ['staff', 'employee', 'cashier', 'team', 'pin', 'login'], a: 'You can add multiple staff members with different roles: Owner, Admin, Manager, or Cashier. Each staff member logs in with a personal PIN — no passwords needed.' },
+  { keywords: ['offline', 'internet', 'wifi', 'connection', 'network'], a: 'MADIS works offline! Sales and inventory changes are saved locally and sync automatically when your internet connection returns.' },
+  { keywords: ['inventory', 'stock', 'product', 'item', 'import', 'csv'], a: 'You can manage inventory in real time — add items manually, import from CSV, set low-stock alerts, and track every sale against stock automatically.' },
+  { keywords: ['report', 'analytics', 'insight', 'revenue', 'profit'], a: 'Reports shows your revenue by category, staff performance, unpaid debts, and a full sales log. Owners also get the Business AI assistant for natural-language queries.' },
+  { keywords: ['setup', 'start', 'begin', 'onboard', 'configure', 'register'], a: 'Setup takes under 5 minutes — register with email, choose your business type, add your first products, and you\'re ready to sell.' },
+  { keywords: ['receipt', 'print', 'invoice'], a: 'MADIS can print receipts for every sale. It also supports customer invoices and supplier purchase invoices with automatic stock updates.' },
+  { keywords: ['cancel', 'stop', 'refund'], a: 'You can cancel anytime. There are no lock-in contracts. Your data remains accessible during the trial and for the duration of any paid period.' },
+  { keywords: ['multi', 'branch', 'location', 'multiple'], a: 'Each business account is independent. For multiple branches, you can create separate accounts — multi-branch support with a central dashboard is on the roadmap.' },
 ];
+
+function matchChatAnswer(query: string): string {
+  const q = query.toLowerCase();
+  const match = CHAT_QA.find(qa => qa.keywords.some(kw => q.includes(kw)));
+  return match?.a ?? "Great question! I'd recommend starting a free trial to explore all features hands-on — no card required. Just click 'Start Free Trial'. Or try the live demo first!";
+}
 
 export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
   const [showDemoPicker, setShowDemoPicker] = useState(false);
@@ -191,12 +206,8 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
     if (!q) return;
     setChatInput('');
     setChatMessages(m => [...m, { from: 'user', text: q }]);
-    const match = CHAT_QA.find(qa => q.toLowerCase().includes(qa.q.toLowerCase().split(' ').slice(0, 3).join(' ')));
     setTimeout(() => {
-      setChatMessages(m => [...m, {
-        from: 'bot',
-        text: match?.a ?? "Great question! I'd recommend starting a free trial to explore all features hands-on. No card required — just click 'Start Free Trial'.",
-      }]);
+      setChatMessages(m => [...m, { from: 'bot', text: matchChatAnswer(q) }]);
     }, 600);
   };
 
@@ -253,7 +264,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
           </p>
           <p className="text-white/65 text-lg sm:text-xl max-w-2xl mx-auto mb-8 leading-relaxed">
             Run your bar, restaurant, spa, gym, or shop from one powerful dashboard.
-            M-Pesa payments, real-time analytics, staff control — all for less than <strong className="text-white">KSh 10 a day</strong>.
+            M-Pesa payments, real-time analytics, staff control — all for less than <strong className="text-white">KSh 3 a day</strong>.
           </p>
 
           {/* CTAs */}
@@ -265,7 +276,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
               <Play size={16} fill="currentColor" className="text-[#4F6EF6]" /> See Live Demo First
             </button>
           </div>
-          <p className="text-white/25 text-xs mb-10">14 days free &nbsp;·&nbsp; Then KSh 299/mo &nbsp;·&nbsp; No credit card to start</p>
+          <p className="text-white/25 text-xs mb-10">14 days free &nbsp;·&nbsp; Then KSh 1,000/yr &nbsp;·&nbsp; No credit card to start</p>
 
           {/* Bullet points */}
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-2">
@@ -282,11 +293,6 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
       {/* ── 2. SOCIAL PROOF BAR ── */}
       <section className="py-10 px-4 sm:px-6 border-y border-white/5 bg-white/2">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-14">
-          <div className="text-center">
-            <p className="text-3xl font-black text-[#4F6EF6]">500+</p>
-            <p className="text-white/40 text-xs font-bold uppercase tracking-widest">Businesses</p>
-          </div>
-          <div className="hidden sm:block w-px h-10 bg-white/10" />
           <div className="text-center">
             <p className="text-3xl font-black text-[#4F6EF6]">10+</p>
             <p className="text-white/40 text-xs font-bold uppercase tracking-widest">Business Types</p>
@@ -358,23 +364,28 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
               </button>
             </div>
 
-            {/* Video placeholder */}
-            <div className="relative w-full lg:w-80 aspect-video lg:aspect-square max-w-sm bg-black/30 rounded-2xl border border-white/10 flex items-center justify-center group cursor-pointer"
-              onClick={() => setShowDemoPicker(true)}>
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#4F6EF6]/20 to-transparent" />
-              <div className="w-16 h-16 bg-[#4F6EF6] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(79,110,246,0.5)] group-hover:scale-110 transition-transform">
-                <Play size={24} fill="white" className="text-white ml-1" />
-              </div>
-              <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-sm rounded-xl p-3 border border-white/10">
-                <div className="flex items-center gap-2">
-                  <QrCode size={14} className="text-[#4F6EF6]" />
-                  <span className="text-[10px] text-white/60 font-bold">Scan to watch</span>
+            {/* Video placeholder + QR code below */}
+            <div className="flex flex-col items-center gap-4 w-full lg:w-80 max-w-sm">
+              <div className="relative w-full aspect-video bg-black/30 rounded-2xl border border-white/10 flex items-center justify-center group cursor-pointer"
+                onClick={() => setShowDemoPicker(true)}>
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#4F6EF6]/20 to-transparent" />
+                <div className="w-16 h-16 bg-[#4F6EF6] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(79,110,246,0.5)] group-hover:scale-110 transition-transform">
+                  <Play size={24} fill="white" className="text-white ml-1" />
                 </div>
+              </div>
+              <div className="flex items-center gap-3 bg-black/40 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/10 w-full">
                 <img
-                  src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&color=4F6EF6&bgcolor=0C1220&data=https://madis.replit.app/demo"
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=72x72&color=4F6EF6&bgcolor=0C1220&data=https://madis.replit.app/demo"
                   alt="QR Code"
-                  className="w-16 h-16 rounded mt-1.5 opacity-90"
+                  className="w-14 h-14 rounded-lg opacity-90 shrink-0"
                 />
+                <div>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <QrCode size={12} className="text-[#4F6EF6]" />
+                    <span className="text-[10px] text-white/70 font-black uppercase tracking-widest">Scan to try</span>
+                  </div>
+                  <p className="text-[10px] text-white/35 leading-relaxed">Open the live demo on your phone</p>
+                </div>
               </div>
             </div>
           </div>
@@ -457,11 +468,11 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
                 </div>
                 <p className="text-white/40 text-xs font-bold mb-1">With MADIS</p>
                 <div className="flex items-end gap-1 mb-0.5">
-                  <span className="text-4xl font-black text-white">KSh 299</span>
-                  <span className="text-white/40 text-sm mb-1">/month</span>
+                  <span className="text-4xl font-black text-white">KSh 1,000</span>
+                  <span className="text-white/40 text-sm mb-1">/year</span>
                 </div>
-                <p className="text-white/25 text-xs mb-1">or KSh 2,499/year (save 30%)</p>
-                <p className="text-emerald-400 text-xs font-bold mb-5">≈ $2.30 USD/month</p>
+                <p className="text-white/25 text-xs mb-1">billed annually · all features included</p>
+                <p className="text-emerald-400 text-xs font-bold mb-5">≈ KSh 83/month</p>
                 <ul className="space-y-2 mb-6">
                   {pricingFeatures.map((f, i) => (
                     <li key={f} className={`flex items-center gap-2 text-xs ${i === 0 ? 'text-emerald-400 font-bold' : 'text-white/65'}`}>
@@ -606,13 +617,13 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
               Your business deserves<br /><span className="text-[#4F6EF6]">better tools.</span>
             </h2>
             <p className="text-white/50 mb-8 max-w-lg mx-auto text-base">
-              Join 500+ African businesses already using MADIS to run smarter, faster, and more profitably. Setup takes under 5 minutes.
+              Join African businesses already using MADIS to run smarter, faster, and more profitably. Setup takes under 5 minutes.
             </p>
             <button onClick={onGetStarted}
               className="inline-flex items-center gap-2 bg-[#4F6EF6] text-white font-black px-10 py-5 rounded-xl hover:bg-[#3D5CE4] transition-all hover:scale-105 text-lg shadow-[0_0_40px_rgba(79,110,246,0.35)]">
               Start Your Free 14-Day Trial <ChevronRight size={20} />
             </button>
-            <p className="text-white/20 text-xs mt-4">No credit card &nbsp;·&nbsp; Full access for 14 days &nbsp;·&nbsp; Then KSh 299/mo</p>
+            <p className="text-white/20 text-xs mt-4">No credit card &nbsp;·&nbsp; Full access for 14 days &nbsp;·&nbsp; Then KSh 1,000/yr</p>
           </div>
         </motion.div>
       </section>
@@ -676,7 +687,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
           <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-white/20 text-xs">
             <span>© {new Date().getFullYear()} MADIS by <span className="text-[#4F6EF6]/60 font-bold">August</span>. All rights reserved.</span>
             <div className="flex items-center gap-6">
-              <span>KSh 299/month</span>
+              <span>KSh 1,000/year</span>
               <span>·</span>
               <span>14-day free trial</span>
               <span>·</span>

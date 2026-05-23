@@ -90,12 +90,7 @@ export default function App() {
   }
 
   if (auth.isLoading) {
-    return (
-      <div className="h-screen bg-[#07090F] flex flex-col items-center justify-center">
-        <div className="w-10 h-10 border-4 border-[#4F6EF6]/20 border-t-[#4F6EF6] rounded-full animate-spin mb-4" />
-        <p className="text-[10px] text-white/30 uppercase tracking-[0.3em] font-black animate-pulse">Loading MADIS...</p>
-      </div>
-    );
+    return null;
   }
 
   if (auth.screen === 'landing' || auth.screen === 'auth') {
@@ -888,7 +883,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
           onClick={onSubscribeNow}
           className="border border-current px-4 py-1 rounded-full text-[10px] uppercase tracking-widest hover:opacity-70 transition-all"
         >
-          Subscribe — KSh 299/mo
+          Subscribe — KSh 1,000/yr
         </button>
       </div>
     )}
@@ -926,7 +921,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
       </div>
 
       {/* Sidebar */}
-      <aside className={`fixed inset-0 z-40 md:relative md:flex w-full md:w-64 border-r themed-border themed-bg-secondary flex-col shrink-0 transition-transform duration-300 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full shadow-2xl md:shadow-none'}`}>
+      <aside className={`fixed inset-0 z-40 md:relative md:flex w-full md:w-64 border-r themed-border themed-bg-secondary flex-col shrink-0 transition-transform duration-300 md:translate-x-0 overflow-hidden ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full shadow-2xl md:shadow-none'}`}>
         <div className="p-6 border-b themed-border flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-[#4F6EF6] rounded-xl flex items-center justify-center shadow-[0_5px_15px_rgba(79,110,246,0.35)]">
@@ -978,9 +973,6 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
               <NavItem active={activeTab === 'staff'} icon={Users} label="Staff" onClick={() => { setActiveTab('staff'); setIsMobileMenuOpen(false); }} />
               <NavItem active={activeTab === 'audit'} icon={History} label="Audit Trail" onClick={() => { setActiveTab('audit'); setIsMobileMenuOpen(false); }} />
               <NavItem active={activeTab === 'settings'} icon={SlidersHorizontal} label="Settings" onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }} />
-              {String(currentUser?.role).toUpperCase() === UserRole.OWNER && (
-                <NavItem active={activeTab === 'ai'} icon={Sparkles} label="Business AI" onClick={() => { setActiveTab('ai'); setIsMobileMenuOpen(false); }} />
-              )}
             </>
           )}
         </nav>
@@ -1439,8 +1431,26 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
             )}
 
             {activeTab === 'reports' && (
-              <motion.div key="reports" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col">
-                <Reports tabs={tabs} inventory={inventory} staff={staff} />
+              <motion.div key="reports" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col gap-8">
+                <Reports
+                  tabs={tabs}
+                  inventory={inventory}
+                  staff={staff}
+                  onDeleteTab={(tabId, name) => showConfirm('Delete Sale', `Permanently delete the sale for "${name}"? This cannot be undone.`, async () => { await deleteTab(tabId); addAuditLog(currentUser!, 'Sale Deleted', `Deleted sale record for ${name}`); }, 'danger')}
+                  onEditTab={async (tabId, customerName) => { const updated = tabs.map(t => t.id === tabId ? { ...t, customerName, updatedAt: Date.now() } : t); await setTabs(updated); addAuditLog(currentUser!, 'Sale Edited', `Updated customer name on sale to ${customerName}`); }}
+                />
+                {String(currentUser?.role).toUpperCase() === UserRole.OWNER && (
+                  <BIChat
+                    uid={uid}
+                    businessName={businessName}
+                    ownerName={ownerName}
+                    tabs={tabs}
+                    inventory={inventory}
+                    staff={staff}
+                    isOnline={isOnline}
+                    isDemo={isDemo}
+                  />
+                )}
               </motion.div>
             )}
 
@@ -1455,20 +1465,6 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
               </motion.div>
             )}
 
-            {activeTab === 'ai' && String(currentUser?.role).toUpperCase() === UserRole.OWNER && (
-              <motion.div key="ai" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full flex flex-col overflow-hidden">
-                <BIChat
-                  uid={uid}
-                  businessName={businessName}
-                  ownerName={ownerName}
-                  tabs={tabs}
-                  inventory={inventory}
-                  staff={staff}
-                  isOnline={isOnline}
-                  isDemo={isDemo}
-                />
-              </motion.div>
-            )}
           </AnimatePresence>
 
           {showTransactionModal && (
@@ -1513,8 +1509,14 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
               businessType={businessType}
               existingCategories={categories}
               onImport={(items) => {
-                const newItems = items.map(item => ({ ...item, id: crypto.randomUUID() }));
-                setInventory([...inventory, ...newItems]);
+                const newItems = items.map(item => ({
+                  ...item,
+                  id: crypto.randomUUID(),
+                  isQuickSell: false,
+                  type: ProductType.DRINK,
+                  updatedAt: Date.now(),
+                }));
+                setInventory([...inventory, ...(newItems as any)]);
                 addAuditLog(currentUser, 'CSV Import', `Imported ${newItems.length} items from CSV`);
                 setShowCSVImport(false);
               }}
