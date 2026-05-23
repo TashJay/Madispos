@@ -52,7 +52,7 @@ const businessTypes = [
   { icon: Wrench,          label: 'Hardware Store',     desc: 'Bulk inventory, supplier POs' },
   { icon: Home,            label: 'Rental & Hotel',     desc: 'Room management, billing' },
   { icon: Pill,            label: 'Pharmacy',           desc: 'Prescriptions, stock, reports' },
-  { icon: Moon,            label: 'Nightclub',          desc: 'Entrance, bar, VIP sections' },
+  { icon: ShoppingCart,    label: 'Grocery Store',      desc: 'Stock tracking, fast checkout' },
 ];
 
 const features = [
@@ -61,7 +61,7 @@ const features = [
   { icon: ShieldCheck,  title: 'Private Data',     desc: "Each business gets a fully isolated database. No other owner sees your data.",    stat: '100% Private' },
   { icon: Users,        title: 'Staff Control',    desc: 'PIN logins, roles (Staff / Supervisor / Owner). Full audit trail of every action.', stat: 'Role-based' },
   { icon: Wifi,         title: 'Works Offline',    desc: "No internet? No problem. MADIS keeps running and syncs when you're back.",        stat: 'Always On' },
-  { icon: CreditCard,   title: 'M-Pesa & Cash',    desc: 'Record M-Pesa STK push and cash payments side-by-side. Built for Kenya.',        stat: 'Kenya-native' },
+  { icon: CreditCard,   title: 'Payments',         desc: 'Record M-Pesa, PayPal, and cash payments side-by-side. Accepted worldwide.',    stat: 'Worldwide' },
   { icon: FileText,     title: 'Invoices',         desc: 'Customer invoices and thermal receipts on the spot. Supplier POs with auto-restock.', stat: 'Professional' },
   { icon: Sparkles,     title: 'Madison',          desc: 'Ask your data in plain English. "Who was my top seller last week?" — instant answer.', stat: 'Owner Feature' },
 ];
@@ -156,7 +156,7 @@ const faqs = [
 ];
 
 const CHAT_QA: { keywords: string[]; a: string }[] = [
-  { keywords: ['price', 'cost', 'how much', 'pricing', 'fee', 'subscription', 'pay'], a: 'MADIS costs KSh 1,000 per year — that\'s less than KSh 3 a day. You get a 14-day free trial with no credit card required. All features are included in the single plan.' },
+  { keywords: ['price', 'cost', 'how much', 'pricing', 'fee', 'subscription', 'pay'], a: 'MADIS costs $10 per year — less than $1 a month. You get a 14-day free trial with no credit card required. All features are included in the single plan. Kenyan users can pay via M-Pesa (≈ KSh 1,300); international users pay via PayPal.' },
   { keywords: ['trial', 'free', 'test', 'try'], a: 'Yes! You get 14 days of full access — no credit card, no commitment. All features included from day one.' },
   { keywords: ['business', 'support', 'type', 'industry', 'work for'], a: 'MADIS supports bars, restaurants, cafés, spas, salons, gyms, retail shops, pharmacies, hardware stores, hotels, rental businesses, and more.' },
   { keywords: ['kenya', 'africa', 'african', 'nairobi', 'local'], a: 'MADIS is built specifically for Kenya — KSh pricing, M-Pesa payment recording, and workflows designed for Kenyan businesses.' },
@@ -264,7 +264,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
           </p>
           <p className="text-white/65 text-lg sm:text-xl max-w-2xl mx-auto mb-8 leading-relaxed">
             Run your bar, restaurant, spa, gym, or shop from one powerful dashboard.
-            M-Pesa payments, real-time analytics, staff control — all for less than <strong className="text-white">KSh 3 a day</strong>.
+            M-Pesa, PayPal, real-time analytics, staff control — all for less than <strong className="text-white">$10 a year</strong>.
           </p>
 
           {/* CTAs */}
@@ -276,7 +276,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
               <Play size={16} fill="currentColor" className="text-[#4F6EF6]" /> See Live Demo First
             </button>
           </div>
-          <p className="text-white/25 text-xs mb-10">14 days free &nbsp;·&nbsp; Then KSh 1,000/yr &nbsp;·&nbsp; No credit card to start</p>
+          <p className="text-white/25 text-xs mb-10">14 days free &nbsp;·&nbsp; Then $10/yr &nbsp;·&nbsp; No credit card to start</p>
 
           {/* Bullet points */}
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-2">
@@ -446,16 +446,16 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
           <p className="text-white/45 mb-14 text-sm">Start free. Pay only when you're ready. One plan — everything included.</p>
 
           <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {/* Paper books comparison */}
+            {/* Without MADIS comparison */}
             <div className="bg-red-500/5 border border-red-500/15 rounded-2xl p-6 text-left opacity-70">
               <p className="text-red-400 font-black text-xs uppercase tracking-widest mb-4">Without MADIS</p>
-              <div className="text-3xl font-black text-white mb-1">KSh 3,000+</div>
-              <p className="text-white/35 text-xs mb-5">per month (paper books, receipt rolls, manual stock counts, lost revenue from errors)</p>
+              <div className="text-3xl font-black text-white mb-1">$20+</div>
+              <p className="text-white/35 text-xs mb-5">per month (paper books, spreadsheets, manual stock counts, lost revenue from errors)</p>
               <ul className="space-y-2 text-xs text-red-400/60">
                 <li className="flex items-center gap-2"><X size={12} /> Manual stock counts</li>
                 <li className="flex items-center gap-2"><X size={12} /> No daily profit report</li>
                 <li className="flex items-center gap-2"><X size={12} /> Cash errors undetected</li>
-                <li className="flex items-center gap-2"><X size={12} /> No M-Pesa tracking</li>
+                <li className="flex items-center gap-2"><X size={12} /> No payment tracking</li>
               </ul>
             </div>
 
@@ -468,11 +468,11 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
                 </div>
                 <p className="text-white/40 text-xs font-bold mb-1">With MADIS</p>
                 <div className="flex items-end gap-1 mb-0.5">
-                  <span className="text-4xl font-black text-white">KSh 1,000</span>
+                  <span className="text-4xl font-black text-white">$10</span>
                   <span className="text-white/40 text-sm mb-1">/year</span>
                 </div>
                 <p className="text-white/25 text-xs mb-1">billed annually · all features included</p>
-                <p className="text-emerald-400 text-xs font-bold mb-5">≈ KSh 83/month</p>
+                <p className="text-emerald-400 text-xs font-bold mb-5">≈ $0.83/month · Less than a coffee</p>
                 <ul className="space-y-2 mb-6">
                   {pricingFeatures.map((f, i) => (
                     <li key={f} className={`flex items-center gap-2 text-xs ${i === 0 ? 'text-emerald-400 font-bold' : 'text-white/65'}`}>
@@ -490,7 +490,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
             {/* Savings breakdown */}
             <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-2xl p-6 text-left">
               <p className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-4">What you save</p>
-              <div className="text-3xl font-black text-white mb-1">KSh 2,700+</div>
+              <div className="text-3xl font-black text-white mb-1">$15+</div>
               <p className="text-white/35 text-xs mb-5">saved per month vs. the old way</p>
               <ul className="space-y-3 text-xs">
                 <li className="flex items-center gap-2 text-white/60"><CheckCircle2 size={12} className="text-emerald-400 shrink-0" /> 3 hrs/week manual stock saved</li>
@@ -513,7 +513,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
           <h2 className="text-3xl sm:text-4xl font-black text-center mb-3">
             Businesses that <span className="text-[#4F6EF6]">trust MADIS</span>
           </h2>
-          <p className="text-white/45 text-center mb-12 text-sm">Real results from real business owners across Kenya.</p>
+          <p className="text-white/45 text-center mb-12 text-sm">Real results from real business owners around the world.</p>
 
           {/* Carousel */}
           <div className="relative max-w-2xl mx-auto">
@@ -617,13 +617,13 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
               Your business deserves<br /><span className="text-[#4F6EF6]">better tools.</span>
             </h2>
             <p className="text-white/50 mb-8 max-w-lg mx-auto text-base">
-              Join African businesses already using MADIS to run smarter, faster, and more profitably. Setup takes under 5 minutes.
+              Join businesses worldwide using MADIS to run smarter, faster, and more profitably. Setup takes under 5 minutes.
             </p>
             <button onClick={onGetStarted}
               className="inline-flex items-center gap-2 bg-[#4F6EF6] text-white font-black px-10 py-5 rounded-xl hover:bg-[#3D5CE4] transition-all hover:scale-105 text-lg shadow-[0_0_40px_rgba(79,110,246,0.35)]">
               Start Your Free 14-Day Trial <ChevronRight size={20} />
             </button>
-            <p className="text-white/20 text-xs mt-4">No credit card &nbsp;·&nbsp; Full access for 14 days &nbsp;·&nbsp; Then KSh 1,000/yr</p>
+            <p className="text-white/20 text-xs mt-4">No credit card &nbsp;·&nbsp; Full access for 14 days &nbsp;·&nbsp; Then $10/yr</p>
           </div>
         </motion.div>
       </section>
@@ -665,7 +665,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
           <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-white/20 text-xs">
             <span>© {new Date().getFullYear()} MADIS by <span className="text-[#4F6EF6]/60 font-bold">August</span>. All rights reserved.</span>
             <div className="flex items-center gap-6">
-              <span>KSh 1,000/year</span>
+              <span>$10/year</span>
               <span>·</span>
               <span>14-day free trial</span>
               <span>·</span>

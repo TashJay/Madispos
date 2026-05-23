@@ -883,7 +883,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
           onClick={onSubscribeNow}
           className="border border-current px-4 py-1 rounded-full text-[10px] uppercase tracking-widest hover:opacity-70 transition-all"
         >
-          Subscribe — KSh 1,000/yr
+          Subscribe — $10/yr
         </button>
       </div>
     )}

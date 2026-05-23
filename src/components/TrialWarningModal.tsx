@@ -81,10 +81,10 @@ export function TrialWarningModal({ daysLeft, onSubscribe, onDismiss }: Props) {
           {/* Price */}
           <div className="text-center mb-6">
             <div className="inline-flex items-end gap-1 mb-1">
-              <span className="text-4xl font-black text-white">KSh 1,000</span>
+              <span className="text-4xl font-black text-white">$10</span>
               <span className="text-white/40 text-sm mb-1">/year</span>
             </div>
-            <p className="text-white/25 text-xs">≈ $1 USD &nbsp;·&nbsp; Less than KSh 3 per day</p>
+            <p className="text-white/25 text-xs">≈ KSh 1,300 &nbsp;·&nbsp; Less than $1/month</p>
           </div>
 
           {/* Actions */}
@@ -94,7 +94,7 @@ export function TrialWarningModal({ daysLeft, onSubscribe, onDismiss }: Props) {
               className="w-full py-4 bg-[#4F6EF6] text-white font-black rounded-xl hover:bg-[#3D5CE4] transition-all hover:scale-[1.02] shadow-[0_8px_20px_rgba(79,110,246,0.3)] flex items-center justify-center gap-2 text-sm"
             >
               <Crown size={15} />
-              Subscribe Now — KSh 1,000/yr
+              Subscribe Now — $10/yr
             </button>
             <button
               onClick={onDismiss}
