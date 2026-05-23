@@ -142,6 +142,8 @@ export default function App() {
         onLogout={auth.logout}
         trialDaysLeft={auth.trialDaysLeft}
         onSubscribeNow={auth.navigateToSubscription}
+        onResetPassword={auth.resetPassword}
+        ownerEmail={auth.firebaseUser?.email || ''}
       />
     );
   }
@@ -187,6 +189,8 @@ interface POSAppProps {
   onLogout: () => void;
   trialDaysLeft?: number | null;
   onSubscribeNow?: () => void;
+  onResetPassword?: (email: string) => Promise<void>;
+  ownerEmail?: string;
   isDemo?: boolean;
   demoData?: {
     staff: User[];
@@ -197,7 +201,7 @@ interface POSAppProps {
   };
 }
 
-function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDaysLeft, onSubscribeNow, isDemo = false, demoData }: POSAppProps) {
+function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDaysLeft, onSubscribeNow, onResetPassword, ownerEmail = '', isDemo = false, demoData }: POSAppProps) {
   const live = usePOSData(isDemo ? '__skip__' : uid, businessType);
 
   const staff       = isDemo ? (demoData?.staff       ?? []) : live.staff;
@@ -248,6 +252,10 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
   const lastActivityRef = useRef(Date.now());
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('madis_theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    } catch {}
     const hour = new Date().getHours();
     return hour >= 6 && hour < 18 ? 'light' : 'dark';
   });
@@ -363,6 +371,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
     } else {
       document.body.classList.remove('light');
     }
+    try { localStorage.setItem('madis_theme', theme); } catch {}
   }, [theme]);
 
   useEffect(() => {
@@ -861,11 +870,11 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
         <button onClick={onLogout} className="underline hover:no-underline">Exit Demo</button>
       </div>
     )}
-    {trialDaysLeft !== null && trialDaysLeft !== undefined && !isDemo && (
+    {trialDaysLeft !== null && trialDaysLeft !== undefined && trialDaysLeft <= 3 && !isDemo && (
       <div className={`fixed top-0 left-0 right-0 z-[99] flex items-center justify-between px-6 py-2 text-xs font-black print:hidden ${
-        trialDaysLeft <= 3
+        trialDaysLeft === 0
           ? 'bg-red-900/95 border-b border-red-500/30 text-red-300'
-          : 'bg-[#07090F]/95 border-b border-amber-500/25 text-amber-400'
+          : 'bg-amber-900/95 border-b border-amber-500/30 text-amber-300'
       } backdrop-blur-sm`}>
         <div className="flex items-center gap-2">
           <Crown size={12} />
@@ -879,11 +888,11 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
           onClick={onSubscribeNow}
           className="border border-current px-4 py-1 rounded-full text-[10px] uppercase tracking-widest hover:opacity-70 transition-all"
         >
-          Subscribe — KSh 1,000/yr
+          Subscribe — KSh 299/mo
         </button>
       </div>
     )}
-    <div className={`h-screen themed-bg-primary flex flex-col md:flex-row overflow-hidden print:hidden ${isDemo ? 'pt-8' : ''} ${(trialDaysLeft !== null && trialDaysLeft !== undefined && !isDemo) ? 'pt-8' : ''}`}>
+    <div className={`h-screen themed-bg-primary flex flex-col md:flex-row overflow-hidden print:hidden ${(isDemo || (trialDaysLeft !== null && trialDaysLeft !== undefined && trialDaysLeft <= 3 && !isDemo)) ? 'pt-8' : ''}`}>
 
       {/* Mobile Top Bar */}
       <div className="md:hidden themed-bg-secondary border-b themed-border p-4 flex items-center justify-between shadow-sm">
@@ -988,23 +997,38 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
             </button>
           )}
 
-          <div className="flex items-center justify-between px-4">
+          {/* Online status + theme toggle */}
+          <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-[#4F6EF6]' : 'bg-red-500'}`} />
+              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-red-500'}`} />
               {isOnline
-                ? <Wifi size={14} className="themed-text-dim" />
-                : <WifiOff size={14} className="themed-text-dim" />
+                ? <Wifi size={13} className="themed-text-dim" />
+                : <WifiOff size={13} className="themed-text-dim" />
               }
               <span className="text-[9px] themed-text-dim font-black uppercase tracking-widest">{isOnline ? 'Online' : 'Offline'}</span>
             </div>
-            <button
-              onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-xl themed-text-dim hover:themed-text transition-colors"
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
+            {/* Theme selector */}
+            <div className="flex items-center gap-1 bg-black/10 border themed-border rounded-xl p-0.5">
+              <button
+                onClick={() => setTheme('light')}
+                title="Light mode"
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${theme === 'light' ? 'bg-[#4F6EF6] text-white shadow-sm' : 'themed-text-dim hover:themed-text'}`}
+              >
+                <Sun size={11} />
+                <span className="hidden sm:inline">Light</span>
+              </button>
+              <button
+                onClick={() => setTheme('dark')}
+                title="Dark mode"
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${theme === 'dark' ? 'bg-[#4F6EF6] text-white shadow-sm' : 'themed-text-dim hover:themed-text'}`}
+              >
+                <Moon size={11} />
+                <span className="hidden sm:inline">Dark</span>
+              </button>
+            </div>
           </div>
 
+          {/* Current staff user card */}
           <div className="px-4 py-3 bg-black/5 rounded-2xl border themed-border">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-[#4F6EF6]/10 rounded-xl flex items-center justify-center border border-[#4F6EF6]/20">
@@ -1017,7 +1041,7 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
               <button
                 onClick={handleLogout}
                 className="p-1.5 hover:text-red-500 themed-text-dim transition-colors"
-                title="Log Out"
+                title="Lock terminal"
               >
                 <LogOut size={14} />
               </button>
@@ -1025,12 +1049,32 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
           </div>
 
           {isOwnerOrAdmin && (
-            <button
-              onClick={onLogout}
-              className="w-full text-[9px] themed-text-dim hover:text-red-400 transition-colors uppercase tracking-widest font-bold text-center py-1"
-            >
-              Switch Account
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onLogout}
+                className="flex-1 text-[9px] themed-text-dim hover:text-red-400 transition-colors uppercase tracking-widest font-bold text-center py-1"
+              >
+                Switch Account
+              </button>
+              {onResetPassword && ownerEmail && (
+                <>
+                  <span className="text-white/10">·</span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await onResetPassword(ownerEmail);
+                        showAlert('Password Reset', `A reset link has been sent to ${ownerEmail}.`);
+                      } catch (e: any) {
+                        showAlert('Error', e.message || 'Could not send reset email.');
+                      }
+                    }}
+                    className="flex-1 text-[9px] text-[#4F6EF6]/60 hover:text-[#4F6EF6] transition-colors uppercase tracking-widest font-bold text-center py-1"
+                  >
+                    Reset Password
+                  </button>
+                </>
+              )}
+            </div>
           )}
 
           <p className="text-[8px] text-[#4F6EF6]/50 text-center uppercase tracking-widest font-bold">
