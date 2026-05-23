@@ -5,7 +5,7 @@ import {
   Coffee, Dumbbell, Scissors, Pill, Home, Wrench, ShoppingBag,
   UtensilsCrossed, Wine, CheckCircle2, ArrowRight, Play,
   Star, Moon, Building2, Wifi,
-  CreditCard, FileText, Package, Lock, Sparkles,
+  CreditCard, FileText, Package, Sparkles,
   ChevronRight, Award, MessageSquare, X, QrCode,
   Phone, Mail, MapPin, ChevronDown, ChevronUp, Zap as ZapIcon,
   BarChart, ShoppingCart, AlertTriangle, Clock, Send
@@ -240,7 +240,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
         <p className="text-[11px] text-[#7B9BFF] font-bold tracking-wide">
           <Clock size={11} className="inline mr-1.5 mb-0.5" />
           <span className="text-white font-black">14-day free trial</span> — full access, no credit card
-          <span className="hidden sm:inline"> &nbsp;·&nbsp; <Lock size={9} className="inline mb-0.5" /> Data encrypted &nbsp;·&nbsp; GDPR compliant</span>
+          <span className="hidden sm:inline"> &nbsp;·&nbsp; No setup fees &nbsp;·&nbsp; Cancel anytime</span>
         </p>
       </div>
 
@@ -364,15 +364,15 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
               </button>
             </div>
 
-            {/* Video placeholder + QR code below */}
+            {/* Video + QR code below */}
             <div className="flex flex-col items-center gap-4 w-full lg:w-80 max-w-sm">
-              <div className="relative w-full aspect-video bg-black/30 rounded-2xl border border-white/10 flex items-center justify-center group cursor-pointer"
-                onClick={() => setShowDemoPicker(true)}>
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#4F6EF6]/20 to-transparent" />
-                <div className="w-16 h-16 bg-[#4F6EF6] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(79,110,246,0.5)] group-hover:scale-110 transition-transform">
-                  <Play size={24} fill="white" className="text-white ml-1" />
-                </div>
-              </div>
+              <video
+                src="/madistut.mp4"
+                controls
+                playsInline
+                className="w-full rounded-2xl border border-white/10 bg-black/30"
+                style={{ aspectRatio: '16/9' }}
+              />
               <div className="flex items-center gap-3 bg-black/40 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/10 w-full">
                 <img
                   src="https://api.qrserver.com/v1/create-qr-code/?size=72x72&color=4F6EF6&bgcolor=0C1220&data=https://madis.replit.app/demo"
@@ -631,7 +631,7 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
       {/* Footer */}
       <footer className="border-t border-white/5 py-14 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-10 mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 mb-10">
             {/* Brand */}
             <div>
               <div className="flex items-center gap-2.5 mb-4">
@@ -640,22 +640,18 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
                 </div>
                 <span className="font-black text-base tracking-tight">MADIS</span>
               </div>
-              <p className="text-white/30 text-xs leading-relaxed mb-4">Market Analysis &amp; Data Insight System. The POS built for African businesses.</p>
-              <div className="flex items-center gap-2 text-[10px] text-white/20">
-                <Lock size={10} className="text-[#4F6EF6]/50" />
-                Data encrypted &nbsp;·&nbsp; GDPR compliant &nbsp;·&nbsp; Firebase secured
-              </div>
+              <p className="text-white/30 text-xs leading-relaxed">Market Analysis &amp; Data Insight System. The POS built for African businesses.</p>
             </div>
 
             {/* Contact */}
             <div>
               <p className="text-white/60 font-black text-xs uppercase tracking-widest mb-4">Contact Us</p>
               <div className="space-y-3 text-sm text-white/40">
-                <a href="tel:+254700000000" className="flex items-center gap-2 hover:text-white/70 transition-colors">
-                  <Phone size={14} className="text-[#4F6EF6]/60 shrink-0" /> +254 700 000 000
+                <a href="tel:+254117747808" className="flex items-center gap-2 hover:text-white/70 transition-colors">
+                  <Phone size={14} className="text-[#4F6EF6]/60 shrink-0" /> +254 117 747 808
                 </a>
-                <a href="mailto:hello@madis.co.ke" className="flex items-center gap-2 hover:text-white/70 transition-colors">
-                  <Mail size={14} className="text-[#4F6EF6]/60 shrink-0" /> hello@madis.co.ke
+                <a href="mailto:muyac45@gmail.com" className="flex items-center gap-2 hover:text-white/70 transition-colors">
+                  <Mail size={14} className="text-[#4F6EF6]/60 shrink-0" /> muyac45@gmail.com
                 </a>
                 <div className="flex items-start gap-2">
                   <MapPin size={14} className="text-[#4F6EF6]/60 shrink-0 mt-0.5" />
@@ -664,24 +660,6 @@ export function LandingPage({ onGetStarted, onSignIn, onDemo }: Props) {
               </div>
             </div>
 
-            {/* Security + trust */}
-            <div>
-              <p className="text-white/60 font-black text-xs uppercase tracking-widest mb-4">Trust & Security</p>
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 bg-white/3 border border-white/7 rounded-xl px-3 py-2">
-                  <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
-                  <span className="text-xs text-white/50">256-bit encryption in transit & at rest</span>
-                </div>
-                <div className="flex items-center gap-2 bg-white/3 border border-white/7 rounded-xl px-3 py-2">
-                  <Lock size={14} className="text-[#4F6EF6] shrink-0" />
-                  <span className="text-xs text-white/50">GDPR compliant · Data never sold</span>
-                </div>
-                <div className="flex items-center gap-2 bg-white/3 border border-white/7 rounded-xl px-3 py-2">
-                  <Wifi size={14} className="text-blue-400 shrink-0" />
-                  <span className="text-xs text-white/50">Powered by Google Firebase</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-white/20 text-xs">
