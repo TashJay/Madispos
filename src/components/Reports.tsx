@@ -16,6 +16,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Download,
 } from 'lucide-react';
 import {
   BarChart,
@@ -89,6 +90,31 @@ export const Reports: React.FC<ReportsProps> = ({ tabs, inventory, staff, onDele
 
   const pagedSales = paidTabs.slice(salesPage * PAGE_SIZE, (salesPage + 1) * PAGE_SIZE);
   const totalPages = Math.ceil(paidTabs.length / PAGE_SIZE);
+
+  const exportCSV = () => {
+    const headers = ['Date', 'Customer', 'Staff', 'Items', 'Total (KES)', 'Payment'];
+    const rows = paidTabs.map(tab => {
+      const staffMember = staff.find(s => s.id === tab.staffId);
+      const date = new Date(tab.updatedAt || tab.createdAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
+      const items = tab.items.map(i => `${i.quantity}x ${i.name}`).join(' | ');
+      return [
+        date,
+        tab.customerName || '',
+        staffMember?.name || '',
+        items,
+        tab.total,
+        tab.paymentType || 'Cash',
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sales_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const startEdit = (tab: Tab) => {
     setEditingTabId(tab.id);
@@ -237,25 +263,36 @@ export const Reports: React.FC<ReportsProps> = ({ tabs, inventory, staff, onDele
 
       {/* Sales Log */}
       <div className="luxury-card themed-bg-secondary border themed-border overflow-hidden">
-        <button
-          onClick={() => setShowSalesLog(s => !s)}
-          className="w-full flex items-center justify-between p-8 text-left hover:bg-black/5 transition-colors"
-        >
-          <div>
-            <h3 className="text-xl font-black themed-text flex items-center gap-3">
-              <TrendingUp size={20} className="text-[#4F6EF6]" />
-              Sales Log
-              <span className="text-[10px] themed-text-dim bg-black/10 border themed-border px-3 py-1 rounded-full font-black uppercase tracking-widest">
-                {paidTabs.length} sales
-              </span>
-            </h3>
-            <p className="themed-text-dim text-sm mt-1">View, edit or delete individual sale records</p>
-          </div>
-          {showSalesLog
-            ? <ChevronUp size={18} className="themed-text-dim shrink-0" />
-            : <ChevronDown size={18} className="themed-text-dim shrink-0" />
-          }
-        </button>
+        <div className="flex items-center gap-3 p-8">
+          <button
+            onClick={() => setShowSalesLog(s => !s)}
+            className="flex-1 flex items-center justify-between text-left"
+          >
+            <div>
+              <h3 className="text-xl font-black themed-text flex items-center gap-3">
+                <TrendingUp size={20} className="text-[#4F6EF6]" />
+                Sales Log
+                <span className="text-[10px] themed-text-dim bg-black/10 border themed-border px-3 py-1 rounded-full font-black uppercase tracking-widest">
+                  {paidTabs.length} sales
+                </span>
+              </h3>
+              <p className="themed-text-dim text-sm mt-1">View, edit or delete individual sale records</p>
+            </div>
+            {showSalesLog
+              ? <ChevronUp size={18} className="themed-text-dim shrink-0" />
+              : <ChevronDown size={18} className="themed-text-dim shrink-0" />
+            }
+          </button>
+          {paidTabs.length > 0 && (
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#4F6EF6]/10 border border-[#4F6EF6]/20 rounded-xl text-[#4F6EF6] text-xs font-black uppercase tracking-widest hover:bg-[#4F6EF6]/20 transition-all shrink-0"
+              title="Export all sales as CSV"
+            >
+              <Download size={13} /> Export CSV
+            </button>
+          )}
+        </div>
 
         <AnimatePresence>
           {showSalesLog && (

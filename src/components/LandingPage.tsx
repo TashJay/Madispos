@@ -63,7 +63,7 @@ const features = [
   { icon: Wifi,         title: 'Works Offline',    desc: "No internet? No problem. MADIS keeps running and syncs when you're back.",        stat: 'Always On' },
   { icon: CreditCard,   title: 'M-Pesa & Cash',    desc: 'Record M-Pesa STK push and cash payments side-by-side. Built for Kenya.',        stat: 'Kenya-native' },
   { icon: FileText,     title: 'Invoices',         desc: 'Customer invoices and thermal receipts on the spot. Supplier POs with auto-restock.', stat: 'Professional' },
-  { icon: Sparkles,     title: 'AI Assistant',     desc: 'Ask your data in plain English. "Who was my top seller last week?" — instant answer.', stat: 'Gemini AI' },
+  { icon: Sparkles,     title: 'Madison',          desc: 'Ask your data in plain English. "Who was my top seller last week?" — instant answer.', stat: 'Owner Feature' },
 ];
 
 const pricingFeatures = [
@@ -76,7 +76,7 @@ const pricingFeatures = [
   'Offline mode — works without internet',
   'M-Pesa & cash payment recording',
   'Customer invoices & receipts',
-  'AI-powered business insights',
+  'Madison business advisor (owners)',
   'Appointments & scheduling',
   'Full audit trail for every transaction',
 ];
@@ -147,7 +147,7 @@ const faqs = [
   },
   {
     q: 'Can I import my existing stock list?',
-    a: 'Yes. You can import inventory from a CSV file. The system will map columns automatically. You can also add items manually one by one or use our AI to suggest a starter inventory for your business type.',
+    a: 'Yes. You can import inventory from a CSV file. The system will map columns automatically. You can also add items manually one by one, or ask Madison to suggest a starter inventory for your business type.',
   },
   {
     q: 'Is M-Pesa integration automatic?',
@@ -166,7 +166,7 @@ const CHAT_QA: { keywords: string[]; a: string }[] = [
   { keywords: ['staff', 'employee', 'cashier', 'team', 'pin', 'login'], a: 'You can add multiple staff members with different roles: Owner, Admin, Manager, or Cashier. Each staff member logs in with a personal PIN — no passwords needed.' },
   { keywords: ['offline', 'internet', 'wifi', 'connection', 'network'], a: 'MADIS works offline! Sales and inventory changes are saved locally and sync automatically when your internet connection returns.' },
   { keywords: ['inventory', 'stock', 'product', 'item', 'import', 'csv'], a: 'You can manage inventory in real time — add items manually, import from CSV, set low-stock alerts, and track every sale against stock automatically.' },
-  { keywords: ['report', 'analytics', 'insight', 'revenue', 'profit'], a: 'Reports shows your revenue by category, staff performance, unpaid debts, and a full sales log. Owners also get the Business AI assistant for natural-language queries.' },
+  { keywords: ['report', 'analytics', 'insight', 'revenue', 'profit'], a: 'Reports shows your revenue by category, staff performance, unpaid debts, and a full sales log. Business owners also get Madison — a private advisor that answers questions about your data in plain English.' },
   { keywords: ['setup', 'start', 'begin', 'onboard', 'configure', 'register'], a: 'Setup takes under 5 minutes — register with email, choose your business type, add your first products, and you\'re ready to sell.' },
   { keywords: ['receipt', 'print', 'invoice'], a: 'MADIS can print receipts for every sale. It also supports customer invoices and supplier purchase invoices with automatic stock updates.' },
   { keywords: ['cancel', 'stop', 'refund'], a: 'You can cancel anytime. There are no lock-in contracts. Your data remains accessible during the trial and for the duration of any paid period.' },

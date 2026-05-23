@@ -1440,16 +1440,27 @@ function POSApp({ uid, businessType, businessName, ownerName, onLogout, trialDay
                   onEditTab={async (tabId, customerName) => { const updated = tabs.map(t => t.id === tabId ? { ...t, customerName, updatedAt: Date.now() } : t); await setTabs(updated); addAuditLog(currentUser!, 'Sale Edited', `Updated customer name on sale to ${customerName}`); }}
                 />
                 {String(currentUser?.role).toUpperCase() === UserRole.OWNER && (
-                  <BIChat
-                    uid={uid}
-                    businessName={businessName}
-                    ownerName={ownerName}
-                    tabs={tabs}
-                    inventory={inventory}
-                    staff={staff}
-                    isOnline={isOnline}
-                    isDemo={isDemo}
-                  />
+                  <div className="themed-bg-secondary border themed-border rounded-[2rem] p-8 flex flex-col gap-6" style={{ minHeight: '520px' }}>
+                    <div className="flex items-center gap-3 pb-4 border-b themed-border shrink-0">
+                      <div className="w-10 h-10 bg-[#4F6EF6]/10 border border-[#4F6EF6]/20 rounded-2xl flex items-center justify-center">
+                        <Sparkles size={18} className="text-[#4F6EF6]" />
+                      </div>
+                      <div>
+                        <h3 className="font-black themed-text text-lg tracking-tight">Madison</h3>
+                        <p className="text-[10px] themed-text-dim uppercase tracking-widest font-black">Your private business advisor</p>
+                      </div>
+                    </div>
+                    <BIChat
+                      uid={uid}
+                      businessName={businessName}
+                      ownerName={ownerName}
+                      tabs={tabs}
+                      inventory={inventory}
+                      staff={staff}
+                      isOnline={isOnline}
+                      isDemo={isDemo}
+                    />
+                  </div>
                 )}
               </motion.div>
             )}

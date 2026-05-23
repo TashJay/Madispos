@@ -43,8 +43,9 @@ function buildContext(businessName: string, tabs: Tab[], inventory: Product[], s
   const staffPerf = staff.map(s => `${s.name} (${s.role}): KES ${(staffSales[s.id] || 0).toLocaleString()} today`).join('; ');
   const lowStock = inventory.filter(i => i.stock < 10).map(i => `${i.name} (${i.stock} left)`).join(', ');
 
-  return `You are a private business intelligence assistant for "${businessName}".
-Help the owner understand business data and make smart decisions. Be concise, friendly, and insightful.
+  return `You are Madison, a private business advisor for "${businessName}".
+Help the owner understand their business data and make smart decisions. Be concise, friendly, and insightful.
+Never mention your underlying technology or that you are an AI model. Just be Madison, their business advisor.
 Respond in the same language as the question. Format numbers clearly. Use bullet points for lists.
 
 Business Snapshot (${new Date().toLocaleString('en-KE')}):
@@ -140,7 +141,7 @@ export const BIChat: React.FC<Props> = ({ uid, businessName, tabs, inventory, st
   const send = async (text?: string) => {
     const q = (text || input).trim();
     if (!q || isLoading) return;
-    if (!isOnline) { setError('AI requires an internet connection.'); return; }
+    if (!isOnline) { setError('Madison requires an internet connection.'); return; }
 
     setInput('');
     setError('');
@@ -196,9 +197,9 @@ export const BIChat: React.FC<Props> = ({ uid, businessName, tabs, inventory, st
         <div>
           <h2 className="text-2xl font-black themed-text tracking-tighter flex items-center gap-2.5">
             <Sparkles size={20} className="text-[#4F6EF6]" />
-            Business Intelligence
+            Madison
           </h2>
-          <p className="themed-text-dim text-xs mt-0.5">Powered by Gemini AI · Private to owner only</p>
+          <p className="themed-text-dim text-xs mt-0.5">Your private business advisor · Owner only</p>
         </div>
         {messages.length > 0 && (
           <button
@@ -228,7 +229,7 @@ export const BIChat: React.FC<Props> = ({ uid, businessName, tabs, inventory, st
       {!isOnline && (
         <div className="mb-3 flex items-center gap-3 bg-amber-500/8 border border-amber-500/20 rounded-xl px-4 py-3 shrink-0">
           <WifiOff size={14} className="text-amber-400 shrink-0" />
-          <p className="text-xs text-amber-400/80">AI requires an internet connection. Your POS continues offline.</p>
+          <p className="text-xs text-amber-400/80">Madison requires an internet connection. Your POS continues working offline.</p>
         </div>
       )}
 
@@ -240,9 +241,9 @@ export const BIChat: React.FC<Props> = ({ uid, businessName, tabs, inventory, st
             <div className="w-14 h-14 bg-[#4F6EF6]/10 rounded-2xl flex items-center justify-center mb-4 border border-[#4F6EF6]/15">
               <Sparkles size={24} className="text-[#4F6EF6]" />
             </div>
-            <p className="font-black themed-text mb-1 text-sm">Ask your AI analyst anything</p>
+            <p className="font-black themed-text mb-1 text-sm">Ask Madison anything about your business</p>
             <p className="text-xs themed-text-dim max-w-xs leading-relaxed">
-              Ask in plain English about your sales, stock, staff, or debts. Responses are generated from your live business data.
+              Ask in plain English about your sales, stock, staff, or debts. Madison reads your live business data to answer.
             </p>
           </div>
         )}
@@ -328,7 +329,7 @@ export const BIChat: React.FC<Props> = ({ uid, businessName, tabs, inventory, st
             onChange={e => { setInput(e.target.value); e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; }}
             onKeyDown={handleKeyDown}
             disabled={!isOnline || isLoading}
-            placeholder={isOnline ? `Ask about ${businessName}…` : 'No internet connection…'}
+            placeholder={isOnline ? `Ask Madison about ${businessName}…` : 'No internet connection…'}
             rows={1}
             className="flex-1 bg-transparent themed-text placeholder-white/20 focus:outline-none text-sm resize-none leading-relaxed min-h-[36px] disabled:opacity-40 py-1 px-1"
             style={{ maxHeight: '120px' }}

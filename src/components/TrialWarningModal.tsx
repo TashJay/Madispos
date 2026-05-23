@@ -11,7 +11,7 @@ const included = [
   'All your existing data stays safe',
   'Unlimited staff & inventory',
   'M-Pesa & cash payment recording',
-  'Business AI & reports',
+  'Madison advisor & reports',
 ];
 
 export function TrialWarningModal({ daysLeft, onSubscribe, onDismiss }: Props) {
